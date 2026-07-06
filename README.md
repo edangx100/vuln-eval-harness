@@ -28,6 +28,8 @@ findings are real?*
 - **Safety** — untrusted code runs only in a **no-network, credential-free Docker
   sandbox**
 
+![Overview](images/overview.png) 
+
 <details>
 <summary><strong>Contents</strong></summary>
 
@@ -317,9 +319,6 @@ python -m src.cli.compare_results results/deepseek-v4-flash.json results/deepsee
 #   →  results/comparison.md
 ```
 
-A startup **preflight** fails fast with an actionable message if Docker isn't running or the sandbox
-image hasn't been built. The deterministic core (schema, normalization, scoring) runs entirely
-offline — no network, no live model — while untrusted execution is confined to the Docker sandbox.
 
 ---
 

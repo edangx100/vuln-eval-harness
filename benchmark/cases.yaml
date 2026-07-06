@@ -1,0 +1,70 @@
+# Benchmark index — 13 self-contained cases modeled on real PyVul records:
+# 10 vulnerable cases (CASE-*) plus 3 negative-control patched twins (NEG-*).
+# Ground truth for each case lives in benchmark/cases/<id>/meta.yaml.
+#
+# Negative controls are safe, patched twins of a vulnerable case:
+# identical code with the one flawed sink repaired. They carry no cwe/
+# vulnerability_type (omitted below and in meta.yaml) and are scored on
+# detection only, feeding a separate false-positive check rather than the
+# capability core.
+#
+# Numbering convention: each NEG-NN mirrors the CASE-NN it patches, so the
+# number is not a running count. We twin the two Layer-2 cases (01, 02) plus
+# CASE-04, hence NEG-01, NEG-02, NEG-04 — the 03 gap is intentional (CASE-03
+# has no twin).
+
+# Corpus version. Every result file records this string so a
+# score is always traceable to the exact corpus it was produced against. Bump
+# it whenever the corpus content changes — add/remove a case, edit a sink, or
+# change any ground truth — so old and new results are never silently compared.
+version: pyvul-eval-corpus-1.0.0
+
+cases:
+  - id: CASE-01-sql-injection
+    cwe: CWE-89
+    vulnerability_type: SQL Injection
+    layer2_eligible: true
+  - id: CASE-02-command-injection
+    cwe: CWE-78
+    vulnerability_type: OS Command Injection
+    layer2_eligible: true
+  - id: CASE-03-path-traversal
+    cwe: CWE-22
+    vulnerability_type: Path Traversal
+    layer2_eligible: false
+  - id: CASE-04-unsafe-deserialization
+    cwe: CWE-502
+    vulnerability_type: Unsafe Deserialization
+    layer2_eligible: false
+  - id: CASE-05-code-injection
+    cwe: CWE-94
+    vulnerability_type: Code Injection
+    layer2_eligible: false
+  - id: CASE-06-xss
+    cwe: CWE-79
+    vulnerability_type: Cross-Site Scripting
+    layer2_eligible: false
+  - id: CASE-07-weak-crypto
+    cwe: CWE-327
+    vulnerability_type: Use of Weak Cryptographic Algorithm
+    layer2_eligible: false
+  - id: CASE-08-weak-randomness
+    cwe: CWE-330
+    vulnerability_type: Use of Insufficiently Random Values
+    layer2_eligible: false
+  - id: CASE-09-improper-input-validation
+    cwe: CWE-20
+    vulnerability_type: Improper Input Validation
+    layer2_eligible: false
+  - id: CASE-10-resource-exhaustion
+    cwe: CWE-400
+    vulnerability_type: Uncontrolled Resource Consumption
+    layer2_eligible: false
+
+  # Negative controls — patched twins (cwe/vulnerability_type deliberately absent).
+  - id: NEG-01-sql-injection-patched      # twin of CASE-01 (Layer-2)
+    layer2_eligible: false
+  - id: NEG-02-command-injection-patched  # twin of CASE-02 (Layer-2)
+    layer2_eligible: false
+  - id: NEG-04-unsafe-deserialization-patched  # twin of CASE-04
+    layer2_eligible: false

@@ -1,0 +1,16 @@
+id: CASE-05-code-injection
+cwe: CWE-94
+vulnerability_type: Code Injection
+is_vulnerable: true
+entry_point: calculate
+file: app.py
+layer2_eligible: false
+difficulty: low
+source_commit: https://github.com/openapi-generators/openapi-python-client/commit/f7a56aae32cba823a77a84a1f10400799b19c19a
+report_link: https://github.com/advisories/GHSA-9x4c-63pf-525f
+description: >
+  User input is passed to eval(), so arbitrary Python code (not just the
+  intended arithmetic) is executed.
+reproduction:
+  input: "calculate(\"__import__('os').getcwd()\")"
+  expected: arbitrary Python executes instead of a math error

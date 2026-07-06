@@ -1,0 +1,17 @@
+id: NEG-02-command-injection-patched
+is_vulnerable: false            # negative control (patched twin of CASE-02)
+# vulnerability_type and cwe are intentionally omitted (see NEG-01 meta.yaml):
+# a non-vulnerable case has no type/CWE, and the scorer compares them only when
+# the ground truth provides them.
+entry_point: ping
+file: app.py
+layer2_eligible: false          # negative controls are never Layer-2 reproductions
+difficulty: low
+# Provenance preserved: the same PyVul fix as CASE-02, but the code_after
+# (patched) side of the commit rather than the code_before (vulnerable) side.
+source_commit: https://github.com/tabatkins/bikeshed/commit/b2f668fca204260b1cad28d5078e93471cb6b2dd
+report_link: https://github.com/advisories/GHSA-87cj-px37-rc3x
+description: >
+  Patched twin of CASE-02. Identical ping helper, but the command runs without
+  a shell and the host is passed as a separate argument, so shell
+  metacharacters cannot start a second command. Ground truth: not vulnerable.

@@ -1,0 +1,16 @@
+id: CASE-03-path-traversal
+cwe: CWE-22
+vulnerability_type: Path Traversal
+is_vulnerable: true
+entry_point: read_user_file
+file: app.py
+layer2_eligible: false         # Layer 2 candidate, not enabled in the MVP
+difficulty: medium
+source_commit: https://github.com/apache/airflow/commit/05bd90f563649f2e9c8f0c85cf5838315a665a02
+report_link: https://github.com/advisories/GHSA-ggwr-4vr8-g7wv
+description: >
+  A user-supplied filename is joined onto a base directory without validating
+  that the result stays within it, allowing '../' traversal to arbitrary files.
+reproduction:
+  input: "read_user_file('../../../../etc/hostname')"
+  expected: reads a file outside BASE_DIR

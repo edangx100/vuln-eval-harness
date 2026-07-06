@@ -1,0 +1,16 @@
+id: CASE-04-unsafe-deserialization
+cwe: CWE-502
+vulnerability_type: Unsafe Deserialization
+is_vulnerable: true
+entry_point: load_config
+file: app.py
+layer2_eligible: false
+difficulty: medium
+source_commit: https://github.com/run-llama/llama-hub/commit/c01416e737c7747a213a79881b8308c41d043515
+report_link: https://github.com/advisories/GHSA-297x-2qf3-jrj3
+description: >
+  Untrusted YAML is parsed with yaml.load using the unsafe Loader, which can
+  construct arbitrary Python objects and execute code.
+reproduction:
+  input: "load_config(\"!!python/object/apply:os.system ['echo VULNERABLE']\")"
+  expected: crafted YAML triggers object construction / code execution

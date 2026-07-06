@@ -1,0 +1,17 @@
+id: NEG-04-unsafe-deserialization-patched
+is_vulnerable: false            # negative control (patched twin of CASE-04)
+# vulnerability_type and cwe are intentionally omitted (see NEG-01 meta.yaml):
+# a non-vulnerable case has no type/CWE, and the scorer compares them only when
+# the ground truth provides them.
+entry_point: load_config
+file: app.py
+layer2_eligible: false          # negative controls are never Layer-2 reproductions
+difficulty: low
+# Provenance preserved: the same PyVul fix as CASE-04, but the code_after
+# (patched) side of the commit rather than the code_before (vulnerable) side.
+source_commit: https://github.com/run-llama/llama-hub/commit/c01416e737c7747a213a79881b8308c41d043515
+report_link: https://github.com/advisories/GHSA-297x-2qf3-jrj3
+description: >
+  Patched twin of CASE-04. Identical config loader, but yaml.safe_load replaces
+  the unsafe yaml.load(Loader=yaml.Loader), so crafted YAML can no longer
+  construct arbitrary Python objects or execute code. Ground truth: not vulnerable.

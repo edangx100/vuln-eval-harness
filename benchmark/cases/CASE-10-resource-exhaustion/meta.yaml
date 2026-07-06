@@ -1,0 +1,14 @@
+id: CASE-10-resource-exhaustion
+cwe: CWE-400
+vulnerability_type: Uncontrolled Resource Consumption
+is_vulnerable: true
+entry_point: read_frame
+file: app.py
+layer2_eligible: false         # demonstrable but unsafe to actually exhaust memory
+difficulty: high        # requires runtime reasoning, not pattern-spotting
+source_commit: https://github.com/eventlet/eventlet/commit/1412f5e4125b4313f815778a1acb4d3336efcd07
+report_link: https://github.com/advisories/GHSA-9p9m-jm8w-94p2
+description: >
+  A frame's declared length comes from an untrusted peer and is used to
+  pre-allocate a buffer with no maximum, allowing memory exhaustion (DoS).
+reproduction: null      # do not actually allocate GBs; reason about the bound

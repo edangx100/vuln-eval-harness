@@ -1,0 +1,14 @@
+id: CASE-08-weak-randomness
+cwe: CWE-330
+vulnerability_type: Use of Insufficiently Random Values
+is_vulnerable: true
+entry_point: generate_token
+file: app.py
+layer2_eligible: false
+difficulty: medium      # commonly missed -> false-negative probe
+source_commit: https://github.com/joestump/python-oauth2/commit/82dd2cdd4954cd7b8983d5d64c0dfd9072bf4650
+report_link: https://github.com/advisories/GHSA-rv8h-p43r-4x5r
+description: >
+  Security tokens are generated with the predictable `random` PRNG instead of
+  a cryptographically secure source (`secrets`), making tokens guessable.
+reproduction: null

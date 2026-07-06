@@ -1,0 +1,16 @@
+id: CASE-06-xss
+cwe: CWE-79
+vulnerability_type: Cross-Site Scripting
+is_vulnerable: true
+entry_point: render_greeting
+file: app.py
+layer2_eligible: false
+difficulty: low
+source_commit: https://github.com/beancount/fava/commit/ca9e3882c7b5fbf5273ba52340b9fea6a99f3711
+report_link: https://github.com/beancount/fava
+description: >
+  User input is reflected into HTML output without escaping, allowing injected
+  <script> markup to execute in the browser (reflected XSS).
+reproduction:
+  input: "render_greeting(\"<script>alert('VULNERABLE')</script>\")"
+  expected: output HTML contains the unescaped <script> tag

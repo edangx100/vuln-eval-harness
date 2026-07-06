@@ -1,0 +1,20 @@
+id: CASE-01-sql-injection
+cwe: CWE-89
+vulnerability_type: SQL Injection
+is_vulnerable: true
+entry_point: login
+file: app.py
+layer2_eligible: true          # used for Layer 2 (reproduction)
+difficulty: low
+source_commit: https://github.com/archesproject/arches/commit/7ed53e23a616edf3301d95814d9d64de5e3072a9
+report_link: https://github.com/advisories/GHSA-gmpq-xrxj-xh8m
+description: >
+  User-controlled username/password are concatenated into a SQL string,
+  allowing injection and authentication bypass.
+reproduction:
+  input: "login('alice', \"' OR '1'='1\")"
+  expected: returns a user row despite an incorrect password (auth bypass)
+  # Machine-checkable form of `expected`: the injected query returns
+  # the admin user's row despite the wrong password, so the leaked `admin` role
+  # appears in the artifact's stdout only when the bypass actually reproduces.
+  success_marker: admin

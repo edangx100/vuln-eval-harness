@@ -1,0 +1,18 @@
+id: NEG-01-sql-injection-patched
+is_vulnerable: false            # negative control (patched twin of CASE-01)
+# vulnerability_type and cwe are intentionally omitted. A non-vulnerable case
+# has no type/CWE, and the scorer compares them only when the ground truth
+# provides them. Leaving them unset makes truth type/cwe = None,
+# which reads as "not applicable" rather than a wrong-but-present answer.
+entry_point: login
+file: app.py
+layer2_eligible: false          # negative controls are never Layer-2 reproductions
+difficulty: low
+# Provenance preserved: the same PyVul fix as CASE-01, but the code_after
+# (patched) side of the commit rather than the code_before (vulnerable) side.
+source_commit: https://github.com/archesproject/arches/commit/7ed53e23a616edf3301d95814d9d64de5e3072a9
+report_link: https://github.com/advisories/GHSA-gmpq-xrxj-xh8m
+description: >
+  Patched twin of CASE-01. Identical login helper, but the credentials are
+  bound as query parameters instead of concatenated into the SQL string, so no
+  injection or authentication bypass is possible. Ground truth: not vulnerable.

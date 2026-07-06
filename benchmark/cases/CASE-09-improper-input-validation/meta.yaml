@@ -1,0 +1,17 @@
+id: CASE-09-improper-input-validation
+cwe: CWE-20
+vulnerability_type: Improper Input Validation
+is_vulnerable: true
+entry_point: transfer
+file: app.py
+layer2_eligible: false
+difficulty: high        # requires reasoning about MISSING checks
+source_commit: https://github.com/aio-libs/aiohttp/commit/1e86b777e61cf4eefc7d92fa57fa19dcc676013b
+report_link: https://security.snyk.io/vuln/SNYK-PYTHON-AIOHTTP-6091622
+description: >
+  A transfer amount is used without validating sign or bounds, so a negative
+  amount credits the account (unauthorized funds) and oversized amounts
+  overdraw it.
+reproduction:
+  input: "transfer(100.0, '-1000')"
+  expected: balance increases to 1100.0 instead of being rejected

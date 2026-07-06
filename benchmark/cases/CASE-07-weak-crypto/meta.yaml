@@ -1,0 +1,17 @@
+id: CASE-07-weak-crypto
+cwe: CWE-327
+vulnerability_type: Use of Weak Cryptographic Algorithm
+is_vulnerable: true
+entry_point: hash_password
+file: app.py
+layer2_eligible: false         # not runtime-demonstrable cheaply; Layer 1 only
+difficulty: low
+source_commit: https://github.com/jpadilla/pyjwt
+report_link: https://github.com/jpadilla/pyjwt
+note: >
+  Anchor is a CWE-327 record in pyjwt; the self-contained case renders the
+  most common instance of the class (MD5 password hashing).
+description: >
+  Passwords are hashed with MD5, a broken algorithm unsuitable for password
+  storage (fast, unsalted, collision-prone).
+reproduction: null      # weakness is analytic, not a single triggering input

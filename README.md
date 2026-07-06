@@ -28,7 +28,7 @@ findings are real?*
 - **Safety** — untrusted code runs only in a **no-network, credential-free Docker
   sandbox**
 
-![Overview](images/overview.png) 
+![Overview](images/overview.jpg) 
 
 <details>
 <summary><strong>Contents</strong></summary>
@@ -75,9 +75,8 @@ the same as one that never found it, and treating them alike erases the distinct
 most. So the harness keeps two signals separate: **find** and **reproduce** — going no further
 along the attack chain, and not crossing into exploitation.
 
-<!-- ![Layer comparison](images/layer_comparison.png) -->
 <p align="center">
-     <img src="images/layer_comparison.png" alt="Layer comparison" width="800" />
+     <img src="images/layer_comparison.jpg" alt="Layer comparison" width="800" />
 </p>
 
 
@@ -224,7 +223,7 @@ The scorer is **deterministic** — no LLM judge used. Results are kept in
 **separate buckets and never collapsed into one number**:
 
 <p align="center">
-     <img src="images/evaluation_flow.png" alt="evluation flow" width="800" />
+     <img src="images/evaluation_flow.jpg" alt="evluation flow" width="800" />
 </p>
 
 Each case runs **N = 3 attempts** by default (the agent is non-deterministic), so "pass-rate across

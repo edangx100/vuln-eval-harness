@@ -1,4 +1,4 @@
-# From Claims to Evidence: An AI Agent Vulnerability Discovery Eval Harness
+# Evaluating AI Agents on Vulnerability Discovery: From Claims to Evidence
 
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
 &nbsp;·&nbsp;
@@ -181,7 +181,12 @@ The agent is given exactly **six restricted tools** and nothing else (least priv
 
 No shell, no debugger. For each test case, the system spins up a fresh temporary folder on the host machine and copies only that case's cleaned-up code into it — this is the agent's "workspace." The agent is given three tools for looking at code: `list_files`, `read_file`, and `grep_search`. All three are wired to check that any path they're given stays inside that one workspace folder. If the agent tries to escape with something like `../../etc/passwd` or an absolute path, the tool blocks the request instead of reading the file.
 
+
 **Keeping the answer hidden.** Normally, the case files in this repo are written to be easy for a *person* to read — the folder names, comments, and docstrings openly say what vulnerability it is and its CWE number. But if the AI agent being tested saw that same text, it'd just be reading the answer instead of actually finding the bug. So before handing a case to the agent, the system builds a cleaned-up copy: it leaves out the answer-key file (`meta.yaml`), renames the code file to something neutral (`submission.py` instead of a folder called `CASE-02-command-injection`), and strips out any comments that name the vulnerability or its CWE; the agent just gets a fair, unlabeled version to work from.
+
+<p align="center">
+     <img src="images/sanitise_answer.png" alt="sanitise answer" width="800" />
+</p>
 
 ---
 
@@ -289,29 +294,14 @@ sample). A cell like **"66.7% (2/3)"** therefore means the agent's proof-of-conc
 bug in **2 of its 3 attempts** — the harness reports this pass-rate rather than a single lucky or
 unlucky run, so a model's *consistency* is visible next to its score.
 
-**What the numbers say — and why separate buckets matter.** Pro is the stronger classifier here —
-ahead on the capability core (76.7% vs 71.1%), detection, type, and CWE — but it does *not* win every
-bucket, and a single blended score would have hidden that: flash is actually better at **function
-location** (76.9% vs 69.2%). Both models scored a perfect **0% false-positive rate** — neither ever
-flagged a safe patched-twin as vulnerable, which is the negative controls doing their job. The
-**Layer-2 "evidence" split is the most telling**: both reproduce OS command injection every time, but
-on SQL injection flash slipped to 2/3 — on one attempt it correctly *diagnosed* the bug (Layer-1
-claim right) yet its proof-of-concept failed to reproduce the effect in the sandbox
-(`effect_not_reproduced`). That is exactly the *claim-right-but-evidence-missing* gap the two-layer
-design exists to expose, made visible instead of averaged away.
+**Why separate buckets matter.** Pro is the stronger classifier (capability core 76.7% vs 71.1%),
+but no single blended score tells the whole story: flash actually wins **function location** (76.9%
+vs 69.2%), and both hit a perfect **0% false-positive rate** on the safe patched-twin controls. The
+**Layer-2 "evidence" split is the most telling** — flash diagnosed one SQL-injection case correctly
+yet its proof-of-concept failed to reproduce the bug in the sandbox (`effect_not_reproduced`). That
+*claim-right-but-evidence-missing* gap is exactly what the two-layer design surfaces instead of
+averaging away.
 
-> **On run-to-run variance and fairness.** With ~13 cases × 3 attempts this is a *reliability-aware
-> comparison*, not a statistically powered ranking — the per-attempt pass-rates in
-> [`results/comparison.md`](results/comparison.md) show where each model is consistent vs. flaky, and
-> the numbers shift somewhat between runs (which is *why* the harness runs repeated attempts rather
-> than one). Separately, the vulnerability-type alias table was extended once (v2) after an earlier
-> run surfaced correct-but-unlisted phrasings (e.g. "Cross-Site Scripting **(XSS)**"), a deliberate
-> extension the alias-table matching is designed for; siblings stay distinct (SQL ≠ OS-command ≠ code injection) and
-> vague terms still don't match.
-
-Each run also writes a full **per-run JSON** with per-attempt detail (every score, retry count, token
-count, PoC script, and Layer-2 verdict) sufficient to recompute every aggregate — the comparison
-report is a *view*, never a separate source of truth.
 
 ---
 

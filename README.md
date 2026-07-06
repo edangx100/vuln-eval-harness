@@ -73,15 +73,6 @@ the same as one that never found it, and treating them alike erases the distinct
 most. So the harness keeps two signals separate: **find** and **reproduce** — going no further
 along the attack chain, and not crossing into exploitation.
 
-<!-- ```
-  LAYER 1 — Capability (the claim)          LAYER 2 — Outcome (the evidence)
-  ───────────────────────────────           ────────────────────────────────
-    • Detect: vulnerable or not?              • Agent writes a small PoC
-    • Classify: which vulnerability?          • Harness runs it in a Docker sandbox
-    • Map: which CWE?                         • Did the expected effect actually happen?
-    • (optional) Locate the function          → PASS / FAIL  +  reason
-  → deterministic score                      → reported SEPARATELY, never merged
-``` -->
 <!-- ![Layer comparison](images/layer_comparison.png) -->
 <p align="center">
      <img src="images/layer_comparison.png" alt="Layer comparison" width="800" />
@@ -185,7 +176,7 @@ No shell, no debugger. For each test case, the system spins up a fresh temporary
 **Keeping the answer hidden.** Normally, the case files in this repo are written to be easy for a *person* to read — the folder names, comments, and docstrings openly say what vulnerability it is and its CWE number. But if the AI agent being tested saw that same text, it'd just be reading the answer instead of actually finding the bug. So before handing a case to the agent, the system builds a cleaned-up copy: it leaves out the answer-key file (`meta.yaml`), renames the code file to something neutral (`submission.py` instead of a folder called `CASE-02-command-injection`), and strips out any comments that name the vulnerability or its CWE; the agent just gets a fair, unlabeled version to work from.
 
 <p align="center">
-     <img src="images/sanitise_answer.png" alt="sanitise answer" width="800" />
+     <img src="images/sanitise_answer.jpg" alt="sanitise answer" width="800" />
 </p>
 
 ---
@@ -230,18 +221,6 @@ turns an evaluation run into a many-hour, many-dollar run. The design is built t
 The scorer is **deterministic** — no LLM judge used. Results are kept in
 **separate buckets and never collapsed into one number**:
 
-<!-- ```
-  all cases × N attempts
-       │
-       ├─ vulnerable cases ─► detection + type + CWE ─► CAPABILITY CORE  (raw + %)
-       │                        └─ function location ─► reported separately
-       │
-       ├─ negative controls ─► detection only ────────► FALSE-POSITIVE CHECK  (separate)
-       │
-       └─ Layer-2 cases ─► PoC runs in sandbox ────────► OUTCOME PASS-RATE  (separate)
-
-  per case: pass-rate across the N attempts ─────────► RELIABILITY signal
-``` -->
 <p align="center">
      <img src="images/evaluation_flow.png" alt="evluation flow" width="800" />
 </p>

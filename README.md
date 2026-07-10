@@ -252,15 +252,6 @@ sandbox, corpus `pyvul-eval-corpus-1.0.0`). The full report is
 [`results/comparison.md`](results/comparison.md), regenerated from the two committed per-run JSON
 files by `src.cli.compare_results`.
 
-> **Read these as illustrative, not as a leaderboard.** Each figure is **N = 3 attempts per case**
-> — a deliberately small, low-cost run to exercise the harness end-to-end, not to rank models. At
-> N = 3 the sampling noise is large: across independent reruns the capability core alone moved by
-> several points from resampling *the same model on the same cases*, so **treat any gap of roughly a
-> dimension or less as within noise**, not a real difference. What the harness demonstrates is the
-> *measurement* — separate buckets, deterministic scoring, sandboxed reproduction — not a verdict on
-> which model is better. Raising N is a one-line config change (`ATTEMPTS_PER_CASE`) when a
-> defensible ranking is the goal.
-
 | Metric *(N = 3 / case)* | `deepseek-v4-flash` | `deepseek-v4-pro` |
 |---|:--:|:--:|
 | Capability core | 70.0% (21.0/30) | 76.7% (23.0/30) |

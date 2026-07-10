@@ -248,39 +248,51 @@ reliably yet also flag safe code — and that trade-off must stay visible.
 ## Example output
 
 These are **real results** from evaluating two OpenRouter models end-to-end (live model + Docker
-sandbox, 3 attempts per case, corpus `pyvul-eval-corpus-1.0.0`). The full report is
+sandbox, corpus `pyvul-eval-corpus-1.0.0`). The full report is
 [`results/comparison.md`](results/comparison.md), regenerated from the two committed per-run JSON
-files by `src.cli.compare_results`:
+files by `src.cli.compare_results`.
 
-| Metric | `deepseek-v4-flash` | `deepseek-v4-pro` |
+> **Read these as illustrative, not as a leaderboard.** Each figure is **N = 3 attempts per case**
+> — a deliberately small, low-cost run to exercise the harness end-to-end, not to rank models. At
+> N = 3 the sampling noise is large: across independent reruns the capability core alone moved by
+> several points from resampling *the same model on the same cases*, so **treat any gap of roughly a
+> dimension or less as within noise**, not a real difference. What the harness demonstrates is the
+> *measurement* — separate buckets, deterministic scoring, sandboxed reproduction — not a verdict on
+> which model is better. Raising N is a one-line config change (`ATTEMPTS_PER_CASE`) when a
+> defensible ranking is the goal.
+
+| Metric *(N = 3 / case)* | `deepseek-v4-flash` | `deepseek-v4-pro` |
 |---|:--:|:--:|
-| **Capability core** | **71.1%** (21.3/30) | **76.7%** (23.0/30) |
-| Detection | 86.7% | 90.0% |
-| Vulnerability type | 63.3% | 66.7% |
-| CWE | 63.3% | 73.3% |
-| Function location *(separate)* | **76.9%** | 69.2% |
-| False-positive rate *(neg. controls)* | **0.0%** | **0.0%** |
+| Capability core | 70.0% (21.0/30) | 76.7% (23.0/30) |
+| Detection | 90.0% | 93.3% |
+| Vulnerability type | 60.0% | 63.3% |
+| CWE | 60.0% | 73.3% |
+| Function location *(separate)* | 74.4% | 74.4% |
+| False-positive rate *(neg. controls)* | 0.0% | 0.0% |
 
 **Layer-2 reproduction — the "evidence"** (does the agent's PoC actually trigger the bug in the
 sandbox?):
 
 | Showcase case | `deepseek-v4-flash` | `deepseek-v4-pro` |
 |---|:--:|:--:|
-| CASE-01 SQL injection | 66.7% (2/3) | **100%** |
-| CASE-02 OS command injection | **100%** | **100%** |
+| CASE-01 SQL injection | 100% (3/3) | 100% (3/3) |
+| CASE-02 OS command injection | 100% (3/3) | 100% (3/3) |
 
-Every case is run **3 independent times** (the agent is non-deterministic, so one attempt is a noisy
-sample). A cell like **"66.7% (2/3)"** therefore means the agent's proof-of-concept reproduced the
-bug in **2 of its 3 attempts** — the harness reports this pass-rate rather than a single lucky or
-unlucky run, so a model's *consistency* is visible next to its score.
+Each case is run **3 independent times** (the agent is non-deterministic, so one attempt is a noisy
+sample). A cell like **"3/3"** means the agent's proof-of-concept reproduced the bug in all three
+attempts; the harness reports this pass-rate rather than a single run, so a model's *consistency* is
+visible next to its score.
 
-**Why separate buckets matter.** Pro is the stronger classifier (capability core 76.7% vs 71.1%),
-but no single blended score tells the whole story: flash actually wins **function location** (76.9%
-vs 69.2%), and both hit a perfect **0% false-positive rate** on the safe patched-twin controls. The
-**Layer-2 "evidence" split is the most telling** — flash diagnosed one SQL-injection case correctly
-yet its proof-of-concept failed to reproduce the bug in the sandbox (`effect_not_reproduced`). That
-*claim-right-but-evidence-missing* gap is exactly what the two-layer design surfaces instead of
-averaging away.
+**Why separate buckets matter.** The point of the harness is that these dimensions are reported
+**separately and never blended into one number.** Detection, vulnerability type, and CWE form the
+capability core; **function location** and the **false-positive rate** are reported apart from it,
+because a model can classify well yet mislocate the flaw, or detect reliably yet flag safe code —
+trade-offs a single score would hide. **Layer-2 is reported apart from Layer-1** for the same
+reason: naming a vulnerability (the *claim*) and reproducing it in the sandbox (the *evidence*) are
+different capabilities, and the split keeps a "diagnosed it but couldn't demonstrate it" gap visible
+rather than averaging it away. In this small N = 3 run both models reproduce both showcase cases and
+keep a 0% false-positive rate on the patched-twin controls; the value on display is the
+*separation of signals*, not the specific figures.
 
 
 ---

@@ -59,6 +59,29 @@ from src.sandbox_preflight import preflight
 from src.schema import VulnerabilityReport
 from src.scorer import score_attempt
 
+# Prefix for the per-case workspace temp directory. It is deliberately **constant
+# and case-independent**. The directory's host path is not private: Docker records
+# the bind-mount source in the container's ``/proc/self/mountinfo``, so any path
+# component here is readable by the untrusted code the agent runs via
+# ``run_python``/``run_pytest``. Interpolating the case id (e.g.
+# ``CASE-02-command-injection-``) would therefore hand the agent the vulnerability
+# class — and ``-patched`` would hand it the negative controls' verdict. The case
+# identity stays host-side, in the results file.
+WORKSPACE_DIR_PREFIX = "workspace-"
+
+
+def _workspace_tempdir() -> tempfile.TemporaryDirectory:
+    """Create a per-case workspace temp directory under a neutral name.
+
+    Takes no case argument, by design: nothing about the case may reach the
+    directory name (see :data:`WORKSPACE_DIR_PREFIX`). ``mkdtemp`` appends random
+    characters, so workspaces stay unique across cases and concurrent runs.
+
+    Returns:
+        An open :class:`tempfile.TemporaryDirectory`; the caller owns cleanup.
+    """
+    return tempfile.TemporaryDirectory(prefix=WORKSPACE_DIR_PREFIX)
+
 # One logger per module, following the standard-library convention already used in
 # `src/agent/observability.py`, so this module's progress lines can be configured or silenced
 # independently of the rest of the application.
@@ -173,7 +196,7 @@ def _run_one_case(
     """
     # A fresh, neutral temp directory per case — cleaned up automatically once every attempt for
     # this case has finished (the `with` block's exit), since nothing later needs it.
-    with tempfile.TemporaryDirectory(prefix=f"{case.id}-") as workspace_dir:
+    with _workspace_tempdir() as workspace_dir:
         workspace = build_sanitized_workspace(case.code_path.parent, Path(workspace_dir))
         case_agent = build_case_agent(model=model, workspace=workspace, runner=runner)
 
